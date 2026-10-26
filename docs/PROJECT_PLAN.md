@@ -296,8 +296,8 @@ Future ideas do not imply a commitment to implement them.
 
 1. Define product and MVP — initial definition complete.
 2. Define roles and business rules — core decisions complete; remaining questions below.
-3. Finalize the data dictionary and PostgreSQL schema — next.
-4. Define application architecture and security enforcement.
+3. Define the PostgreSQL schema — initial implementation complete; review provisional defaults below.
+4. Define application architecture and capability enforcement — next.
 5. Set up the application and development environment.
 6. Implement authentication, tenant isolation, and permissions.
 7. Implement clients and contacts.
@@ -339,3 +339,23 @@ Before finalizing the schema:
 | Ticket descriptions | Technicians may edit after creation |
 | Comments | Internal-only in V1 |
 
+## 17. Initial PostgreSQL Implementation
+
+The executable schema is in [`database/migrations/001_initial.sql`](../database/migrations/001_initial.sql). Setup instructions, runtime security requirements, and provisional decisions are in [`database/README.md`](../database/README.md). Database checks are in [`database/tests/schema.sql`](../database/tests/schema.sql).
+
+Implemented: seven core tables, composite tenant/client foreign keys, row-level tenant security, internal comments, tenant-specific numbering, completion constraints and timestamps, ticket history, soft-delete fields, and dashboard/search indexes.
+
+Provisional implementation defaults, pending product confirmation:
+
+- Fixed role values; application policies will expose individual capabilities.
+- Proposed statuses and priorities; no transition matrix yet.
+- Soft deletion and before/after ticket snapshots, including description changes.
+- At most one active, nondeleted primary contact per client; none is permitted.
+- Required client name/type and contact/user first and last names; client/contact email and phone optional.
+- Case-insensitive user email uniqueness within a tenant, reserved after soft deletion; identify the tenant before login.
+- Integer ticket numbers allocated atomically within each tenant; display formatting deferred.
+- Existing references survive deactivation/soft deletion; referenced records cannot be hard-deleted.
+- Existing assignees remain on completed tickets after user deactivation; reopening clears current completion timestamps while preserving history.
+- Categories deferred until confirmed.
+
+Role authorization, new-reference eligibility, comment mutation history, provisioning/login access, restore permissions, and concurrent technician claim integration remain application work. These defaults do not add to the confirmed decision log. The uppercase `PROJECT_PLAN.md` is the current plan; lowercase `project_plan.md` remains historical.
