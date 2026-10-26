@@ -1,8 +1,10 @@
-# HelpDesk — Project Plan
+# CaseLantern — Historical Project Plan
+
+This document preserves the early product outline under the current project name. See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the authoritative plan.
 
 ## 1. Product Overview
 
-HelpDesk is a multi-tenant SaaS ticket management platform designed
+CaseLantern is a multi-tenant SaaS ticket management platform designed
 for technical support organizations to track, manage, and resolve
 client issues.
 

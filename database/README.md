@@ -1,4 +1,4 @@
-# PostgreSQL schema
+# CaseLantern PostgreSQL schema
 
 The initial schema targets PostgreSQL 17 without extensions. Laravel has not been scaffolded; this SQL is the source of truth until converted to Laravel migrations.
 
@@ -10,6 +10,12 @@ psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f database/tests/schema.sql
 ```
 
 Run tests in a disposable database containing the migration, as a superuser able to create a test role. Fixtures and that role roll back; identity sequences may advance. The migration does not drop or silently skip existing tables.
+
+## Database naming
+
+For a fresh installation, use database `caselantern`, migration role `caselantern_migrator`, and restricted runtime role `caselantern_app`. Role privileges and tenant isolation requirements below still apply. The SQL migration does not create or hard-code these deployment accounts.
+
+If you already created `helpdesk`, `helpdesk_migrator`, or `helpdesk_app` while following the initial server walkthrough, they remain usable. The product rename does not rename a live database or its accounts. Keep using the existing names in connection settings until a deliberate database/account rename is performed; do not create a second database accidentally. The disposable test role is now `caselantern_schema_test_runtime` and rolls back with the test transaction.
 
 ## Model and provisional defaults
 

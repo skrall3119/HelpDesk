@@ -40,11 +40,11 @@ SET LOCAL app.user_id='200';
 INSERT INTO tickets(id,tenant_id,client_id,contact_id,created_by_user_id,subject,description) OVERRIDING SYSTEM VALUE VALUES (200,200,200,200,200,'Other tenant','Problem');
 SELECT pg_temp.assert_true((SELECT ticket_number=1 FROM tickets WHERE id=100) AND (SELECT ticket_number=1 FROM tickets WHERE id=200), 'tenant numbering');
 -- Verify policies as a non-owner, non-superuser, without BYPASSRLS.
-CREATE ROLE helpdesk_schema_test_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS;
-GRANT USAGE ON SCHEMA public TO helpdesk_schema_test_runtime;
-GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO helpdesk_schema_test_runtime;
-GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO helpdesk_schema_test_runtime;
-SET LOCAL ROLE helpdesk_schema_test_runtime;
+CREATE ROLE caselantern_schema_test_runtime NOLOGIN NOSUPERUSER NOBYPASSRLS;
+GRANT USAGE ON SCHEMA public TO caselantern_schema_test_runtime;
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO caselantern_schema_test_runtime;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO caselantern_schema_test_runtime;
+SET LOCAL ROLE caselantern_schema_test_runtime;
 SELECT pg_temp.assert_true((SELECT count(*)=0 FROM tickets), 'missing tenant context fails closed');
 SET LOCAL app.tenant_id='100';
 SET LOCAL app.user_id='100';

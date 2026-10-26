@@ -1,4 +1,4 @@
-# HelpDesk — Project Plan
+# CaseLantern — Project Plan
 
 Last updated: 2026-10-26
 
@@ -8,7 +8,7 @@ This is the authoritative product and implementation plan. The older lowercase `
 
 ## 1. Product and outcome
 
-HelpDesk is a multi-tenant support application. A tenant is a support organization; its clients are businesses or individuals receiving support. Internal employees log in. Client contacts are customer-side people and do not have accounts in V1.
+CaseLantern is a multi-tenant support application. A tenant is a support organization; its clients are businesses or individuals receiving support. Internal employees log in. Client contacts are customer-side people and do not have accounts in V1.
 
 The first usable release lets an organization maintain clients/contacts, record issues, share responsibility, and preserve the investigation and change history. A technician sees all tickets in their tenant, claims unassigned work, records internal comments, and progresses issues to completion. Managers coordinate assignments. Administrators also manage employees and organization settings.
 
@@ -196,7 +196,7 @@ erDiagram
     USER ||--o{ TICKET_ACTIVITY : performs
 ```
 
-Every domain table is tenant-scoped, directly or through the tenant's own ID. Composite foreign keys enforce tenant/client consistency. Ticket numbers start at 1 per tenant; format as `HD-000001` in the UI as a working default, without storing the prefix/padding. Larger numbers expand naturally; never reset/reuse numbers. Number allocation serializes ticket creation per tenant; acceptable for the initial release, subject to measurement.
+Every domain table is tenant-scoped, directly or through the tenant's own ID. Composite foreign keys enforce tenant/client consistency. Ticket numbers start at 1 per tenant; format as `CL-000001` in the UI as a working default, without storing the prefix/padding. Larger numbers expand naturally; never reset/reuse numbers. Number allocation serializes ticket creation per tenant; acceptable for the initial release, subject to measurement.
 
 Tenant-first indexes cover filters, assignments, relationships, and timelines. The English full-text index searches ticket subjects/descriptions; it does not search comments or provide arbitrary substring matching. Search by an exact number should use the number index. Add indexes only when actual query plans justify them.
 
@@ -387,7 +387,7 @@ Answers override the corresponding working defaults throughout this plan. If cat
 
 ### Defaults available for review; do not block scaffolding
 
-Soft deletion with manager/admin restoration; optional primary contact; optional client/contact email/phone; names required; tenant-scoped case-insensitive user email; integer numbering displayed as `HD-000001`; current contact information; preserved inactive historical relationships; ticket snapshot history; eligible assignees include all ticket-working roles; server-rendered Laravel/Livewire frontend; no public API/registration.
+Soft deletion with manager/admin restoration; optional primary contact; optional client/contact email/phone; names required; tenant-scoped case-insensitive user email; integer numbering displayed as `CL-000001`; current contact information; preserved inactive historical relationships; ticket snapshot history; eligible assignees include all ticket-working roles; server-rendered Laravel/Livewire frontend; no public API/registration.
 
 ### Needed before production
 
@@ -396,6 +396,7 @@ Hosting/provider/budget/region/domain; outbound recovery mail; backup/recovery t
 ## 20. Confirmed decision record
 
 | Source | Decision |
+| Owner decision, 2026-10-26 | Product renamed to CaseLantern; machine-readable project name is `caselantern` |
 | --- | --- |
 | Prior product discussion | Tenant is a support organization; clients/contacts receive its services |
 | Prior product discussion | Internal employees only; one tenant per employee; three fixed roles |
