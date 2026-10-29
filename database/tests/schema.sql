@@ -35,7 +35,11 @@ SELECT pg_temp.assert_true((SELECT resolved_at IS NULL AND closed_at IS NULL FRO
 INSERT INTO ticket_comments(tenant_id,ticket_id,user_id,body) VALUES (100,100,100,'Internal investigation');
 SELECT pg_temp.rejects($q$INSERT INTO ticket_comments(tenant_id,ticket_id,user_id,body) VALUES (100,100,200,'Wrong actor')$q$, '23503');
 SELECT pg_temp.rejects($q$DELETE FROM ticket_activities WHERE ticket_id=100$q$, 'P0001');
-SELECT pg_temp.rejects($q$DELETE FROM contacts WHERE id=100$q$, '23503');
+-- PostgreSQL 18 reports RESTRICT deletes as restrict_violation (23001);
+-- PostgreSQL 17 reports foreign_key_violation (23503).
+SELECT pg_temp.rejects($q$DELETE FROM contacts WHERE id=100$q$,
+    CASE WHEN current_setting('server_version_num')::integer >= 180000
+        THEN '23001' ELSE '23503' END);
 SET LOCAL app.user_id='200';
 INSERT INTO tickets(id,tenant_id,client_id,contact_id,created_by_user_id,subject,description) OVERRIDING SYSTEM VALUE VALUES (200,200,200,200,200,'Other tenant','Problem');
 SELECT pg_temp.assert_true((SELECT ticket_number=1 FROM tickets WHERE id=100) AND (SELECT ticket_number=1 FROM tickets WHERE id=200), 'tenant numbering');

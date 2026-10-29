@@ -1,6 +1,6 @@
 # CaseLantern PostgreSQL schema
 
-The initial schema targets PostgreSQL 17 without extensions. Laravel has not been scaffolded; this SQL is the source of truth until converted to Laravel migrations.
+The initial schema targets PostgreSQL 17 and is also checked on PostgreSQL 18, without extensions. Laravel has not been scaffolded; this SQL is the source of truth until converted to Laravel migrations.
 
 Apply once to a fresh database as a migration owner:
 
@@ -72,3 +72,5 @@ WHERE deleted_at IS NULL
 ```
 
 The SQL suite checks tenant/client relationships, required contacts, completion constraints, reopening timestamps, numbering, email/primary-contact uniqueness, history, restricted deletion, and runtime writes under RLS. Application permissions and concurrent claim integration require tests once the application exists.
+
+The restricted-contact-deletion check expects SQLSTATE `23503` on PostgreSQL 17 and `23001` on PostgreSQL 18. Both represent the expected rejection of deleting a referenced contact; other foreign-key assertions retain their specific expected codes.
