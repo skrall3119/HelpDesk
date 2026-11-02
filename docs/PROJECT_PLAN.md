@@ -21,7 +21,8 @@ Success means a new organization can be provisioned, its administrator can add e
 | Product requirements and initial decisions | Documented | Confirmed rules are retained below |
 | PostgreSQL domain schema | Implemented | Seven tables, constraints, indexes, triggers, tenant policies; name/status reconciliation required |
 | Database checks | Implemented; previously passed on PostgreSQL 17 | Constraints, audit behavior, and non-owner RLS checks |
-| Laravel application and frontend | Not started | No application scaffold or dependency manifests |
+| Laravel application and frontend | Scaffold implemented | Laravel skeleton committed; assets and two smoke tests passed on the server; business screens remain unbuilt |
+| Tenant provisioning CLI | Implemented; verification pending | `caselantern:provision-tenant`; owner connection, atomic creation, hidden administrator password; new tests require server execution |
 | Authentication and capability policies | Not started | Database role values are not application authorization |
 | Deployment, CI, backups, and production provisioning | Not started | Requirements and gates are defined in this plan |
 
@@ -244,6 +245,8 @@ Framework tables for sessions, password-reset tokens, jobs/cache, and migration 
 The current RLS design cannot resolve an unknown tenant ID from its slug through the ordinary tenant policy. Implement and test a narrowly scoped tenant lookup function returning only ID and active status for an exact slug. If using SECURITY DEFINER, use a dedicated least-privilege owner, fixed safe search path, qualified objects, restricted EXECUTE grants, and no general table-write/admin privileges. The migration or maintenance superuser must never be the web connection. This is a required implementation task, not an existing function.
 
 Working implementation defaults: validate hosts against the configured base domain, keep session cookies host-only (`SESSION_DOMAIN` unset/null), and generate login/recovery URLs for the resolved tenant host. Local testing can use `acme.localhost:8000` through the existing SSH tunnel; verify hostname resolution on the user's browser. The production base domain and wildcard DNS/TLS remain deployment decisions. Subdomain selection never substitutes for tenant authorization or PostgreSQL context.
+
+Provisioning implementation: [`TENANT_PROVISIONING.md`](TENANT_PROVISIONING.md) documents `php artisan caselantern:provision-tenant`, its command-scoped migration credentials, password prompts, and disposable PostgreSQL checks. It reserves a tenant identity before establishing transaction-local context, so tenant/admin inserts satisfy forced RLS. No browser login or public provisioning endpoint is implemented by this slice. New command and PostgreSQL tests have not yet been run in the authoring workspace.
 
 ### Request sequence
 
