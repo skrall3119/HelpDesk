@@ -1,6 +1,6 @@
 # CaseLantern PostgreSQL schema
 
-The schema targets PostgreSQL 17/18 without extensions. The original SQL baseline remains unchanged. Apply the forward migration for the confirmed single-name and Closed-only workflow. A Laravel wrapper is included for an existing application; the application scaffold and its original baseline wrapper are not currently in this repository.
+The schema targets PostgreSQL 17/18 without extensions. The original SQL baseline remains unchanged. Apply the forward migration for the confirmed single-name and Closed-only workflow. Both Laravel migration wrappers and the application scaffold are in the repository. For a fresh checkout or the existing server, use [the development guide](../docs/DEVELOPMENT.md) and its dedicated `pgsql_migrator` connection; direct SQL below is an alternative path, not an additional install step.
 
 Apply once to a fresh database as a migration owner:
 
@@ -19,20 +19,20 @@ The server has recorded `2026_10_29_195159_establish_caselantern_baseline`. Keep
 - `002_names_and_ticket_workflow.sql`
 - `2026_11_02_000001_reconcile_names_and_ticket_workflow.php`
 
-From the Laravel root, using the migration-owner database connection:
+From the Laravel root, supply process-scoped `DB_MIGRATION_USERNAME` and `DB_MIGRATION_PASSWORD` as shown in the development guide, then use the migration-owner connection:
 
 ```sh
-php artisan migrate:status
-php artisan migrate --pretend
-php artisan migrate
-php artisan migrate:status
+php artisan migrate:status --database=pgsql_migrator
+php artisan migrate --database=pgsql_migrator --pretend
+php artisan migrate --database=pgsql_migrator
+php artisan migrate:status --database=pgsql_migrator
 ```
 
 Use either the Laravel wrapper or direct SQL, never both on the same database. The wrapper uses Laravel's PostgreSQL migration transaction; direct SQL requires `psql -1`. The SQL has no embedded transaction so either caller can manage the entire change atomically. It is intentionally not rerunnable. Do not run `migrate:fresh` or roll back the baseline to apply this update. The new migration's `down()` refuses a lossy reversal.
 
 The migration locks users, contacts, and tickets, temporarily removes FORCE RLS for the owner backfill, and restores FORCE RLS and all existing triggers before commit. Run as the table owner or a maintenance superuser, never the runtime account. Name backfills combine first/last names with a space. Existing Resolved tickets become Closed, using their prior resolution timestamp; existing audit snapshots remain unchanged, and no employee closure event is fabricated. Legacy audit entries may still contain `resolved` and `resolved_at`; history rendering must tolerate these old snapshots. New writes use only the new fields.
 
-Update any locally scaffolded models, forms, factories, and provisioning commands that use first/last name or `resolved` before using them with the new schema; they are not present here to update.
+New application code must use the post-forward-migration fields. The scaffold and provisioning command are present; domain forms and authentication remain future slices.
 
 ## Upgrade validation
 

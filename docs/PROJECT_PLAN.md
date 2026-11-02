@@ -22,7 +22,7 @@ Success means a new organization can be provisioned, its administrator can add e
 | PostgreSQL domain schema | Implemented and applied | Seven domain tables; name/workflow forward migration applied in batch 2; remaining client/contact and comment-revision requirements need targeted forward work |
 | Database checks | Passed per owner on PostgreSQL 18.6 | Upgrade/schema checks cover constraints, audit behavior, and non-owner RLS; earlier PostgreSQL 17 baseline pass remains historical evidence |
 | Laravel application and frontend | Scaffold implemented | Laravel skeleton committed; assets and two smoke tests passed on the server; business screens remain unbuilt |
-| Tenant provisioning CLI | Implemented and verified | 17 tests / 59 assertions passed including three PostgreSQL tests; Pint passed; Janci Tech (`jancitech`, tenant 1 / administrator 1) created successfully |
+| Tenant provisioning CLI | Implemented and verified | 17 tests / 59 assertions passed including three PostgreSQL tests; Pint passed; initial tenant/admin creation verified |
 | Authentication and capability policies | Not started | Database role values are not application authorization |
 | Development access | Verified | Asset build, smoke tests, restricted runtime connection, and SSH-forwarded welcome page work |
 | Deployment, CI, backups, and release operations | Not started | Development server is not production hosting; remaining work is scheduled below |
@@ -247,7 +247,7 @@ The current RLS design cannot resolve an unknown tenant ID from its slug through
 
 Working implementation defaults: validate hosts against the configured base domain, keep session cookies host-only (`SESSION_DOMAIN` unset/null), and generate login/recovery URLs for the resolved tenant host. Local testing can use `acme.localhost:8000` through the existing SSH tunnel; verify hostname resolution on the user's browser. The production base domain and wildcard DNS/TLS remain deployment decisions. Subdomain selection never substitutes for tenant authorization or PostgreSQL context.
 
-Provisioning implementation: [`TENANT_PROVISIONING.md`](TENANT_PROVISIONING.md) documents `php artisan caselantern:provision-tenant`, its command-scoped migration credentials, password prompts, and disposable PostgreSQL checks. It reserves a tenant identity before establishing transaction-local context, so tenant/admin inserts satisfy forced RLS. No browser login or public provisioning endpoint is implemented by this slice. The owner ran the command/real PostgreSQL tests successfully on the server (17 tests, 59 assertions), confirmed formatting, and provisioned Janci Tech; no password is recorded here.
+Provisioning implementation: [`TENANT_PROVISIONING.md`](TENANT_PROVISIONING.md) documents `php artisan caselantern:provision-tenant`, its command-scoped migration credentials, password prompts, and disposable PostgreSQL checks. It reserves a tenant identity before establishing transaction-local context, so tenant/admin inserts satisfy forced RLS. No browser login or public provisioning endpoint is implemented by this slice. The owner ran the command/real PostgreSQL tests successfully on the server (17 tests, 59 assertions), confirmed formatting, and provisioned an initial organization; no password is recorded here.
 
 ### Request sequence
 
@@ -430,7 +430,7 @@ Hosting/provider/budget/region/domain; outbound recovery mail; backup/recovery t
 | Owner decision, 2026-11-02 | Categories deferred beyond V1 |
 | Owner decision, 2026-11-02 | Tenant subdomains select independent tenant accounts; replace the proposed `/t/{tenant_slug}` routing |
 | Schema work | PostgreSQL baseline/forward workflow migration applied and checks passed; Laravel scaffold exists, business application remains to be built |
-| Verified on server, 2026-11-02 | Provisioning tests passed (17 tests, 59 assertions); Janci Tech created with slug `jancitech`; browser authentication still unbuilt |
+| Verified on server, 2026-11-02 | Provisioning tests passed (17 tests, 59 assertions); initial tenant/admin creation verified; browser authentication still unbuilt |
 | Owner capacity, 2026-11-02 | Daily sprint schedule assumes four focused hours per workday; relative-day forecast includes explicit contingency |
 | Git upload request | Baseline plan/schema/setup notes/tests uploaded to repository `main` in commit `7f46fd0` |
 

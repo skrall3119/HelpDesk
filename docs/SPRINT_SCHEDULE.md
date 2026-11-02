@@ -12,7 +12,14 @@ The target is the agreed **V1 through a verified release**, not the later-releas
 backlog. This schedule supplements [PROJECT_PLAN.md](PROJECT_PLAN.md), which owns
 product rules. Completing a database migration is not completing its application UI.
 
-## Current position: do not repeat completed work
+## Progress
+
+| Day | Status | Update | Verification |
+| --- | --- | --- | --- |
+| Foundation | Complete | Database, Laravel scaffold, asset build, and tenant provisioning established. | SQL and provisioning checks passed; foundation merged to `main`. |
+| 1 | Verified; merge pending | Reproducible setup, scoped grants, A/B fixtures, and PostgreSQL CI. [PR #2](https://github.com/skrall3119/HelpDesk/pull/2). | CI and development-server PHPUnit: **21 tests, 91 assertions, no skips**. [CI](https://github.com/skrall3119/HelpDesk/actions/runs/41524492056). |
+
+## Planning baseline: completed work
 
 | Area | Verified state | Evidence / remaining boundary |
 | --- | --- | --- |
@@ -22,7 +29,7 @@ product rules. Completing a database migration is not completing its application
 | Runtime identity | Laravel connects to `caselantern` as restricted `caselantern_app` | Migration identity remains separate; runtime authentication is not browser authentication |
 | Frontend and access | `npm ci` and asset build passed; welcome page loads through SSH forwarding | Optional fontaine warning did not block build; no tenant pages yet |
 | Provisioning | Tenant/admin creation implemented and exercised | 17 provisioning tests, 59 assertions passed, including three real PostgreSQL tests; Pint passed for four files |
-| Initial organization | Janci Tech, slug `jancitech`, tenant ID 1, administrator ID 1 | Owner ran the command successfully; do not recreate or overwrite this account |
+| Initial organization | First tenant and administrator provisioned | Preserve existing tenant data during subsequent setup |
 | Remaining foundation | Authentication, tenant host resolution, capability policies, recovery, CI | Reviewed `routes/web.php` still serves only welcome; no tenant middleware registered; Livewire not installed in reviewed Composer manifest |
 | Remaining product | Employees, clients, contacts, tickets, comments/history, dashboard, organization settings | Tables and triggers exist for much of the domain; browser workflows are unbuilt |
 | Remaining operations | Staging/production topology, wildcard DNS/TLS, recovery mail, backups, monitoring, runbook | Development HTTP server and SSH tunnel are not production hosting |
@@ -71,7 +78,7 @@ If a contingency slot is unused, pull forward the next scheduled task.
 | 1 | Review/merge the existing foundation through the repository's chosen review process; reconcile approved requirements; document server start/test/migration commands; establish a minimal PostgreSQL CI job and reusable A/B test fixtures | Foundation is recoverable from Git; CI skeleton runs; no server-only credential or schema dependency is hidden |
 | 2 | Add the narrowly scoped tenant-by-slug lookup and forward migration/grants; use fixed safe search path and least-privilege ownership for any SECURITY DEFINER function | Runtime can resolve only the intended lookup fields; unknown/disabled tenant handling and privilege boundaries tested |
 | 3 | Configure base domain, strict subdomain parsing/trusted hosts, and request transaction/context middleware; order it before binding/auth queries and clear context on every completion/failure | Two-host requests and reused connections remain isolated; missing context fails closed; no reads occur after transaction cleanup |
-| 4 | Adapt User model/provider for tenant email, active/deleted status; build login/logout, host-only sessions, generic credential errors, rate limiting, CSRF, and a protected landing page | Janci Tech can log in/out on `jancitech.localhost:8000`; invalid credentials and inactive records fail safely |
+| 4 | Adapt User model/provider for tenant email, active/deleted status; build login/logout, host-only sessions, generic credential errors, rate limiting, CSRF, and a protected landing page | A provisioned tenant can log in/out on its local subdomain; invalid credentials and inactive records fail safely |
 | 5 | Test cross-subdomain sessions, same email in two tenants, host tampering, deactivation on existing sessions, transaction failures, and local browser flow | Authentication/context tests pass with non-owner PostgreSQL credentials; owner sees a real protected tenant page |
 
 **Gate:** tenant identity comes from the validated host, authenticated identity
@@ -215,9 +222,10 @@ to expose blockers; features remain sequential where they share unverified found
 
 ## Tracking and reforecasting
 
-For every day record planned work, actual focused hours, commit/PR, checks and
-results, unresolved blocker, and next dependency. A day is complete only when its
-exit condition passes. Do not count skipped integration tests as passed tests.
+Keep progress updates in the table above: one brief entry per day with status,
+deliverable, PR, and verification. Add a blocker only when one exists; do not create
+separate daily status documents or copy terminal logs. A day is complete when its
+exit condition passes. Skipped tests are not passed tests.
 
 Reforecast after each sprint. If scope grows, a gate fails, or a day exceeds its
 budget, consume explicit contingency or move downstream days. Do not recover time
