@@ -19,11 +19,13 @@ Success means a new organization can be provisioned, its administrator can add e
 | Artifact | Status | Meaning |
 | --- | --- | --- |
 | Product requirements and initial decisions | Documented | Confirmed rules are retained below |
-| PostgreSQL domain schema | Implemented | Seven tables, constraints, indexes, triggers, tenant policies; name/status reconciliation required |
-| Database checks | Implemented; previously passed on PostgreSQL 17 | Constraints, audit behavior, and non-owner RLS checks |
-| Laravel application and frontend | Not started | No application scaffold or dependency manifests |
+| PostgreSQL domain schema | Implemented and applied | Seven domain tables; name/workflow forward migration applied in batch 2; remaining client/contact and comment-revision requirements need targeted forward work |
+| Database checks | Passed per owner on PostgreSQL 18.6 | Upgrade/schema checks cover constraints, audit behavior, and non-owner RLS; earlier PostgreSQL 17 baseline pass remains historical evidence |
+| Laravel application and frontend | Scaffold implemented | Laravel skeleton committed; assets and two smoke tests passed on the server; business screens remain unbuilt |
+| Tenant provisioning CLI | Implemented and verified | 17 tests / 59 assertions passed including three PostgreSQL tests; Pint passed; Janci Tech (`jancitech`, tenant 1 / administrator 1) created successfully |
 | Authentication and capability policies | Not started | Database role values are not application authorization |
-| Deployment, CI, backups, and production provisioning | Not started | Requirements and gates are defined in this plan |
+| Development access | Verified | Asset build, smoke tests, restricted runtime connection, and SSH-forwarded welcome page work |
+| Deployment, CI, backups, and release operations | Not started | Development server is not production hosting; remaining work is scheduled below |
 
 Existing files:
 
@@ -40,9 +42,9 @@ The schema does not by itself implement a usable or production-ready SaaS applic
 - Tenant-aware employee login/logout and account recovery.
 - Administrator employee management with fixed Administrator, Manager, and Technician roles.
 - Clients of type individual or business, one address per client, and multiple contacts.
-- Optional primary contact, required ticket contact, and current contact information on ticket pages.
+- Required primary contact created atomically with each new client; every contact has a name and email or phone; required matching ticket contact and current contact information on ticket pages.
 - Ticket creation/editing, editable descriptions, status/priority, assignment, and self-claim.
-- Internal comments and ticket activity/history.
+- Internal comments with author edits, retained revisions, manager/admin soft deletion, and ticket activity/history.
 - Soft deletion of tickets by administrators/managers and a restricted restoration view.
 - Dashboard views for all tickets, my tickets, and unassigned tickets; filters, search, and pagination.
 - Minimal organization settings: display name; tenant slug changes reserved for controlled provisioning.
@@ -50,7 +52,7 @@ The schema does not by itself implement a usable or production-ready SaaS applic
 
 ### Working default: later releases
 
-**Confirmed:** categories are deferred beyond V1. No category management, ticket category field, category filters, or category schema is required in V1. Reports remain deferred under the existing scope default. Attachments, public registration, billing/subscriptions, client portals, email-to-ticket, outbound ticket notifications, SLAs, teams, custom roles, multiple addresses, AI features, integrations, and public APIs are outside V1.
+**Confirmed:** categories are deferred beyond V1. No category management, ticket category field, category filters, or category schema is required in V1. Reports are excluded from V1, as previously agreed. Attachments, public registration, billing/subscriptions, client portals, email-to-ticket, outbound ticket notifications, SLAs, teams, custom roles, multiple addresses, AI features, integrations, and public APIs are outside V1.
 
 Account-recovery email is infrastructure for authentication and is separate from deferred ticket email integration. If outbound email is unavailable in a development environment, use a local mail sink; production recovery must work before release.
 
@@ -65,7 +67,7 @@ Implement Laravel policies/gates with a centralized capability map. Controllers,
 | View all live tenant tickets and current client/contact details | Yes | Yes | Yes |
 | Create/edit tickets and original descriptions | Yes | Yes | Yes |
 | Add internal comments | Yes | Yes | Yes |
-| Change status/priority; close assigned tickets | Yes | Yes | Yes; workflow question below |
+| Change status/priority; close assigned tickets | Yes | Yes | Yes; workflow rules below |
 | Claim unassigned ticket for self | Yes | Yes | Yes |
 | Assign/reassign to another eligible employee | Yes | Yes | No |
 | Remove assignment from unfinished ticket | Working default: yes | Working default: yes | No |
@@ -75,7 +77,7 @@ Implement Laravel policies/gates with a centralized capability map. Controllers,
 | Deactivate/restore clients and contacts | Yes | Yes | No |
 | Manage users/roles | Yes | No | No |
 | Manage organization settings | Yes | No | No |
-| Edit/delete posted comments | Deferred by default | Deferred by default | Deferred by default |
+| Edit own comments / soft-delete comments | Yes / Yes | Own only / Yes | Own only / No |
 | View reports if introduced | Yes | Yes | No by default |
 
 Technical defaults: all three roles have the capability to work tickets and may self-claim. Assignment targets are active, nondeleted employees with that capability. If assignment must be limited strictly to the Technician role, adjust eligibility before the ticket-assignment milestone.
@@ -99,7 +101,7 @@ Users cannot change their own tenant, promote themselves through profile editing
 
 ### Confirmed status workflow
 
-The target workflow uses the following values. The current SQL baseline still contains `resolved` and lacks `on_hold`; reconcile its constraints, triggers, tests, and documentation with this confirmed workflow.
+The applied forward migration `002_names_and_ticket_workflow.sql` implements these stored values. The unchanged historical baseline contains the former values; fresh installs apply both migrations.
 
 | Stored status | Display label | Meaning |
 | --- | --- | --- |
@@ -139,24 +141,24 @@ Use row locking or conditional updates against an expected version for concurren
 
 ### Completion timestamps
 
-Target behavior: closing sets `closed_at`; reopening clears it while retaining previous closures in ticket history. Remove `resolved_at` from the target schema. The existing baseline's resolution/completion triggers must be updated to match. Application forms must not accept user-supplied completion timestamps, creator, tenant, identity, or ticket number.
+Implemented in the applied forward migration: closing sets `closed_at`; reopening clears it while retaining previous closures in ticket history. `resolved_at` has been removed from current tickets; historical audit snapshots remain readable with legacy fields. Application forms must not accept user-supplied completion timestamps, creator, tenant, identity, or ticket number.
 
 ## 7. Clients, contacts, and validation
 
-Confirmed name model: users and contacts each have one required `name` field. People may include their full name in that field; separate first/last name fields are not required. The existing SQL baseline must be reconciled accordingly. Other input requirements below remain working defaults unless otherwise confirmed.
+Confirmed name model, implemented by the forward migration: users and contacts each have one required `name` field. People may include their full name in that field; separate first/last name fields are not required. Previously approved client/contact creation rules below remain application/schema work to implement.
 
 | Entity | Required input | Optional input |
 | --- | --- | --- |
 | Tenant | Name, URL-safe unique slug during provisioning | None for initial setup |
 | User | One nonblank `name`, tenant-unique email, role, secure password setup | Remember-me preference |
-| Client | Name, type (`individual` or `business`) | Email, phone, one address |
-| Contact | Client, one nonblank `name` | Email, phone, job title, primary flag |
+| Client | Name, type (`individual` or `business`), primary contact created in the same transaction | General email, phone, one address |
+| Contact | Client, one nonblank `name`, nonblank email or phone | Job title, the other contact method |
 | Ticket | Client, matching contact, subject, description | Assignee; status/priority have defaults |
 | Comment | Ticket and nonblank body | None |
 
 Validation trims ordinary surrounding whitespace, rejects blank required strings, validates supplied emails/country codes, and preserves phone/postal formatting. Require a reasonable request-size limit; initial application limits: names/subject 255 characters, email 254, phone 50, address fields 255, postal code 32, description 50,000, comment 20,000. These are working application limits, not existing SQL column limits. Store/render descriptions and comments as escaped plain text in V1.
 
-Primary contacts: zero or one active, nondeleted primary contact per client. Changing primary is transactional: clear the old flag and set the new one; the partial unique index protects races. Deactivation removes a contact from active-primary eligibility but does not choose a replacement automatically.
+Confirmed creation behavior: create the client and its primary contact together in one transaction; failure creates neither record. Each contact needs a name and at least one nonblank email or phone. Replace a client's primary contact before deactivating the existing primary; never silently select a replacement. Changing primary is transactional, and the existing partial unique index protects against multiple active primaries. The existing baseline only enforces at most one primary and permits missing contact methods; add the remaining validation/forward constraints and action invariants before exposing client creation.
 
 New tickets and changed relationships may only select active, nondeleted clients/contacts. Existing tickets remain readable when their client/contact becomes inactive. Do not block an unrelated ticket edit merely because a preserved historical relationship is inactive. Existing contacts cannot be moved between clients; create the correct contact and explicitly change the ticket relationship instead. Changing a ticket's client requires selecting a valid contact for the new client in the same transaction.
 
@@ -173,13 +175,13 @@ New tickets and changed relationships may only select active, nondeleted clients
 
 The ticket audit trigger records creation and meaningful ticket updates, including before/after descriptions, assignment, status, priority, soft deletion, and restoration. It requires an active actor in the tenant. `created` and `updated` are stored activity types; the UI derives field-specific labels by comparing snapshots. Avoid recording duplicate application events for the same SQL-triggered change.
 
-Working default: posted comments cannot be edited or deleted in V1; users add a correcting comment. The existing schema permits storage for later comment mutation but has no comment-history trigger. If editing/deleting comments is requested, design its authorization and history before exposing it.
+Previously accepted behavior: authors can edit their own comments; managers/administrators can soft-delete comments; preserve revision history. Administrators retain all tenant permissions. Comments remain internal. The current schema has no comment-revision storage/history trigger, so add a forward migration and authorized revision-aware actions before exposing mutation. The later append-only working default did not override that earlier acceptance.
 
 Activity is internal and contains potentially sensitive prior descriptions. Do not copy full snapshots or comment text into application logs. Activity update/delete triggers are safeguards, not a tamper-proof audit system against a privileged database operator or compromised application.
 
 ## 9. Database model and ownership
 
-All primary keys are bigint identities generated by PostgreSQL. Timestamps are timezone-aware; store instants consistently and display them in the user's/browser's chosen timezone, using UTC as the fallback. The following describes the target model. The current SQL baseline still uses separate user/contact names and separate resolution fields; reconcile those differences before application implementation:
+All primary keys are bigint identities generated by PostgreSQL. Timestamps are timezone-aware; store instants consistently and display them in the user's/browser's chosen timezone, using UTC as the fallback. The following describes the current seven-table model after both migrations. Comment-revision storage remains planned forward work; do not edit an already-applied baseline:
 
 | Table | Main fields and responsibility |
 | --- | --- |
@@ -189,7 +191,7 @@ All primary keys are bigint identities generated by PostgreSQL. Timestamps are t
 | `contacts` | Tenant/client, single `name`, email/phone/job title, primary/active flags, timestamps/deletion |
 | `tickets` | Tenant, generated tenant-specific number, client/contact, assignee/creator, status/priority, subject/description, `closed_at`, creation/update/deletion timestamps |
 | `ticket_comments` | Tenant/ticket, author (`user_id`), body, timestamps/deletion |
-| `ticket_activities` | Tenant/ticket, actor (`user_id`), `activity_type`, JSONB `old_values`/`new_values`, creation time |
+| `ticket_activities` | Tenant/ticket, actor (`user_id`), `activity_type`, JSONB `old_values`/`new_values`, `status_reason`, creation time |
 
 There is no `roles` or `categories` table and no `category_id` field in the initial schema. Categories are confirmed deferred beyond V1. There is no `password_hash` attribute; Laravel stores its secure hash in `password`. There are no historical contact snapshots.
 
@@ -214,9 +216,9 @@ Tenant-first indexes cover filters, assignments, relationships, and timelines. T
 
 ## 10. Application architecture
 
-**Working implementation direction:** one Laravel application with a server-rendered Blade frontend, Livewire for interactive forms/filters, and Tailwind CSS for styling. PostgreSQL 17 remains the database target. Use Laravel policies, Form Requests or equivalent server validation, Eloquent models, and small domain action classes. Avoid a separate SPA/API and microservices for V1.
+**Working implementation direction:** one Laravel application with a server-rendered Blade frontend, Livewire for interactive forms/filters, and Tailwind CSS for styling. PostgreSQL 18.6 is the verified development server version; use PostgreSQL 18 for required integration/CI checks. The historical SQL baseline also passed earlier PostgreSQL 17 checks. Use Laravel policies, Form Requests or equivalent server validation, Eloquent models, and small domain action classes. Avoid a separate SPA/API and microservices for V1.
 
-At scaffolding, verify and pin a compatible supported Laravel/PHP/Livewire toolchain, commit dependency lockfiles, and document exact versions in the root README. This plan does not claim versions have already been installed. Use PHPUnit through Laravel's testing facilities; select one test style and apply it consistently.
+The server has Laravel 13.39.0, PHP 8.5.12, Composer 2.10.3, Node 22.23.1, npm 10.9.8, and committed Composer/npm lockfiles. Platform checks and asset build passed. Livewire is not yet installed in the reviewed manifest; integrate a compatible version when interactive UI work begins and document reproducible setup in the root README. Use PHPUnit through Laravel's testing facilities; select one test style and apply it consistently.
 
 Suggested responsibilities:
 
@@ -239,15 +241,19 @@ Framework tables for sessions, password-reset tokens, jobs/cache, and migration 
 
 ### Tenant routing and bootstrap
 
-Working default routes live under `/t/{tenant_slug}`. Login uses the organization slug plus email/password; the same email may exist in different tenants. Do not offer public tenant creation in V1. Provision tenants and their first administrator using a controlled CLI command, with no default/shared passwords.
+**Confirmed:** tenant routes use `{tenant_slug}.{base_domain}`, such as `acme.example.com`; there is no `/t/{tenant_slug}` prefix. The subdomain selects the tenant, and login uses that tenant's independent email/password account; the same email may exist in different tenants. Do not offer public tenant creation in V1. Provision tenants and their first administrator using a controlled CLI command, with no default/shared passwords.
 
 The current RLS design cannot resolve an unknown tenant ID from its slug through the ordinary tenant policy. Implement and test a narrowly scoped tenant lookup function returning only ID and active status for an exact slug. If using SECURITY DEFINER, use a dedicated least-privilege owner, fixed safe search path, qualified objects, restricted EXECUTE grants, and no general table-write/admin privileges. The migration or maintenance superuser must never be the web connection. This is a required implementation task, not an existing function.
 
+Working implementation defaults: validate hosts against the configured base domain, keep session cookies host-only (`SESSION_DOMAIN` unset/null), and generate login/recovery URLs for the resolved tenant host. Local testing can use `acme.localhost:8000` through the existing SSH tunnel; verify hostname resolution on the user's browser. The production base domain and wildcard DNS/TLS remain deployment decisions. Subdomain selection never substitutes for tenant authorization or PostgreSQL context.
+
+Provisioning implementation: [`TENANT_PROVISIONING.md`](TENANT_PROVISIONING.md) documents `php artisan caselantern:provision-tenant`, its command-scoped migration credentials, password prompts, and disposable PostgreSQL checks. It reserves a tenant identity before establishing transaction-local context, so tenant/admin inserts satisfy forced RLS. No browser login or public provisioning endpoint is implemented by this slice. The owner ran the command/real PostgreSQL tests successfully on the server (17 tests, 59 assertions), confirmed formatting, and provisioned Janci Tech; no password is recorded here.
+
 ### Request sequence
 
-1. Resolve the tenant from the route through the restricted lookup path; provide generic failures and rate limits to reduce tenant/account enumeration.
+1. Resolve the tenant slug from an exact single-label subdomain of the configured base domain, then resolve the tenant through the restricted lookup path; provide generic failures and rate limits to reduce tenant/account enumeration.
 2. Start the domain transaction on the runtime connection; set `app.tenant_id` locally before fetching tenant/user/domain rows.
-3. Authenticate/reload the session user inside that tenant. Verify active tenant, active/nondeleted user, and session tenant match. Bind authenticated identity to the session; switching the slug must never change a logged-in user's tenant.
+3. Authenticate/reload the session user inside that tenant. Verify active tenant, active/nondeleted user, and session tenant match. Bind authenticated identity to the session; switching the tenant subdomain must never change a logged-in user's tenant.
 4. Set `app.user_id` from the authenticated user before any ticket write; perform policy checks before actions.
 5. Commit only successful operations; roll back failures. Never stream/lazily load protected rows after the context transaction ends.
 
@@ -269,13 +275,13 @@ RLS enforces tenant boundaries; policies enforce capabilities, active-record eli
 
 | Screen | Required behavior and acceptance |
 | --- | --- |
-| Tenant login/recovery | Slug-aware login; clear validation; generic authentication errors; safe redirects |
+| Tenant login/recovery | Subdomain-scoped login; clear validation; generic authentication errors; safe redirects |
 | Ticket dashboard | All/My/Unassigned views; hide On Hold/Closed/deleted by default; status filters, search, pagination, newest first |
 | New ticket | Active client picker, dependent contact picker, subject/description, priority, authorized assignment |
 | Ticket detail | Number, status, priority, current client/contact, assignee/creator, description, internal comments, activity |
 | Edit ticket | Preserve input on validation errors; stale-write conflict; dependent client/contact validation |
 | Clients | Search/list, create/edit as authorized, type/active status, client detail and ticket list |
-| Contacts | Manage from client detail; optional primary contact; no cross-client selection |
+| Contacts | Manage from client detail; required primary on client creation, safe replacement, email or phone required; no cross-client selection |
 | User administration | Administrator-only create/update/deactivate; role validation; last-admin protection |
 | Organization settings | Administrator-only name update; slug and counter are not editable here |
 | Deleted tickets | Manager/admin-only list/detail/restore; no technician access |
@@ -290,7 +296,7 @@ Provide loading, empty, validation, forbidden/not-found, and conflict states; ke
 
 ## 13. HTTP/application interface
 
-V1 serves authenticated browser routes, not a public API. Proposed route families under `/t/{tenant_slug}`:
+V1 serves authenticated browser routes, not a public API. Route families on each `{tenant_slug}.{base_domain}` host:
 
 | Route/action family | Responsibility |
 | --- | --- |
@@ -306,7 +312,7 @@ Use GET only for reads, POST for creation/actions, PATCH for updates, and DELETE
 
 ## 14. Test and validation plan
 
-Use real PostgreSQL 17 for database/feature/integration tests; SQLite cannot validate this RLS/trigger design. Exercise production-like non-owner credentials as well as a separate migration/test-maintenance identity. Keep test data synthetic.
+Use real PostgreSQL 18 for required database/feature/integration tests; SQLite cannot validate this RLS/trigger design. Exercise production-like non-owner credentials as well as a separate migration/test-maintenance identity. Keep test data synthetic.
 
 | Area | Required evidence |
 | --- | --- |
@@ -317,7 +323,7 @@ Use real PostgreSQL 17 for database/feature/integration tests; SQLite cannot val
 | Assignment | Self-claim only; no technician reassignment; manager reassignment; inactive target rejection; two concurrent claims yield one winner |
 | Workflow | Every allowed transition and rejected transition, closure without assignee rejected, unassignment/completion race, reopen timestamps, inactive historical assignee behavior |
 | History | Description before/after, actor, creation, reassignment, deletion/restoration; transaction rollback leaves no partial audit |
-| Edits/comments | Blank input rejection, escaped output, no generic-field bypass, stale-write conflict, no comment mutation UI |
+| Edits/comments | Blank input rejection, escaped output, no generic-field bypass, stale-write conflict, comment ownership, soft deletion, and revision preservation |
 | Queries | All/My/Unassigned, combined filters, exact-number/full-text search, pagination, no deleted rows, deterministic ordering |
 | Operations | Fresh install, controlled provision, migration failure, production-role grants, backup restore, tenant-disabled access |
 
@@ -327,7 +333,7 @@ Definition of done for each implementation slice: authorized behavior works, den
 
 ## 15. Development workflow and CI
 
-Working default local setup: Docker Compose with application/PHP tooling, PostgreSQL 17, and a development mail sink. Bind local services appropriately; no committed credentials. A root README will document installation, migrations, provisioning, assets, test commands, and troubleshooting once scaffolded. Provide `.env.example` with safe placeholders and committed Composer/npm lockfiles.
+Verified development setup: the existing native remote Fedora server with Laravel/PHP, PostgreSQL 18.6, built frontend assets, and Windows SSH forwarding. Keep this workflow; Docker Compose is optional portability work and is not a V1 prerequisite. Add development mail capture for recovery/setup testing. Bind local services appropriately; no committed credentials. A root README will document installation, migrations, provisioning, assets, test commands, and troubleshooting once scaffolded. Provide `.env.example` with safe placeholders and committed Composer/npm lockfiles.
 
 CI should run on proposed changes: install locked dependencies, check formatting/static analysis, build frontend assets, create a fresh PostgreSQL database, migrate/provision fixtures, run SQL and application tests, and exercise non-owner runtime credentials. Do not substitute a superuser connection for RLS assertions. Add browser checks after the first vertical slice exists. Test migration from the last release before production database changes.
 
@@ -335,12 +341,12 @@ Use small commits tied to milestones. Keep migration changes versioned; once app
 
 ## 16. Delivery roadmap and acceptance gates
 
-No calendar estimate is committed before the first slice establishes the development workflow. Execute these in order; each gate is reviewable independently.
+The development workflow and provisioning slice are established. The owner selected four focused hours per workday. [SPRINT_SCHEDULE.md](SPRINT_SCHEDULE.md) now provides a 45-workday forecast (180 hours including 20 hours of explicit contingency) through V1 release. Days are relative, not committed dates; reforecast after each sprint. Existing milestones below remain acceptance gates, not claims that all work in each milestone is already finished.
 
 | Milestone | Deliverables | Exit condition |
 | --- | --- | --- |
 | M0: planning/schema baseline | Current plan, seven-table schema, documented assumptions | Existing SQL checks pass; product questions tracked |
-| M1: runnable foundation | Laravel/Blade/Livewire scaffold, pinned dependencies, Compose, migration adoption, README, CI skeleton | Fresh checkout boots; schema applies once; SQL tests pass on PostgreSQL |
+| M1: runnable foundation | Laravel/Blade/Livewire scaffold, pinned dependencies, documented native development setup, migration adoption, README, CI skeleton | Fresh checkout boots; schema applies once; SQL tests pass on PostgreSQL |
 | M2: tenant/auth/security foundation | Tenant lookup/provision CLI, runtime grants, context middleware, login/logout/recovery, policies, two-tenant fixtures | Non-owner isolation tests pass; inactive accounts/tenants blocked; reset flow tenant-safe |
 | M3: employees and clients | Administrator user management, last-admin protection, client/contact forms, primary contact | Tenant A administrator creates employee/client/contact; tenant B cannot see them |
 | M4: first ticket slice | Ticket create/list/detail/edit, contact dependency, numbering, displayed audit history | Authenticated user creates a ticket and sees its number/current contact/history |
@@ -348,7 +354,7 @@ No calendar estimate is committed before the first slice establishes the develop
 | M6: dashboard and usability | All/My/Unassigned, filters, number/full-text search, pagination, responsive states | Main browser journeys pass with realistic synthetic data and bounded queries |
 | M7: release preparation | Staging deploy, mail/session config, monitoring, backup/restore, runbook | Release gates below pass; owner accepts staging workflow |
 
-### First development session: M1 tasks
+### Original M1 checklist (historical; use the daily schedule for remaining work)
 
 1. Reconcile the SQL baseline, tests, and database documentation with the confirmed single `name` fields and Closed-only completion workflow (including On Hold, transition rules, and `closed_at` behavior); preserve data with forward migrations if already applied to a shared environment. Then confirm available PHP/Composer/Node/Docker tooling and pin a compatible application toolchain.
 2. Scaffold the application without replacing the existing plan or database files.
@@ -358,7 +364,7 @@ No calendar estimate is committed before the first slice establishes the develop
 6. Add the root README, example environment, reproducible commands, and initial CI job.
 7. Open the initial browser page and verify the project can be started again from the documented steps.
 
-M1 can begin while product answers are pending. Do not ship affected capability/workflow paths until their answers or explicitly accepted defaults are recorded.
+The scaffold, migration adoption, SQL checks, asset build, and local browser access in this historical checklist are complete. CI, reproducible root documentation, Livewire, and remaining acceptance work are scheduled; do not repeat completed setup or provision the existing tenant again.
 
 ## 17. Deployment and operations
 
@@ -393,13 +399,13 @@ V1 is ready when:
 | --- | --- | --- | --- |
 | Q1 — confirmed | Can technicians create/edit clients and contacts? | Yes; only managers/admins deactivate/restore | M3 policies and controls |
 | Q2 — confirmed | Who can close and reopen tickets? | All three internal roles; closure requires an assignee; enforce the transition matrix in section 6 | M5 policies/workflow |
-| Q3 — categories confirmed | Include categories/reports/comment editing in first release? | Categories deferred beyond V1; reports remain deferred and comments append-only under existing working defaults | M3–M6 scope/schema |
+| Q3 — confirmed scope | Include categories/reports/comment editing in first release? | No V1 categories or reports; internal comment author edits, manager/admin soft deletion, and revision retention per earlier accepted defaults | M3–M6 scope/schema |
 
 Answers override the corresponding working defaults throughout this plan. Categories are outside V1. If introduced in a later release, define category management and access before adding schema/UI. Any later report scope requires measures, filters, and access rules.
 
 ### Defaults available for review; do not block scaffolding
 
-Soft deletion with manager/admin restoration; optional primary contact; optional client/contact email/phone; names required; tenant-scoped case-insensitive user email; integer numbering displayed as `CL-000001`; current contact information; preserved inactive historical relationships; ticket snapshot history; eligible assignees include all ticket-working roles; server-rendered Laravel/Livewire frontend; no public API/registration.
+Soft deletion with manager/admin restoration; required primary contact at client creation; contact email or phone required; general client contact details optional; names required; tenant-scoped case-insensitive user email; integer numbering displayed as `CL-000001`; current contact information; preserved inactive historical relationships; ticket snapshot history; eligible assignees include all ticket-working roles; server-rendered Laravel/Livewire frontend; no public API/registration.
 
 ### Needed before production
 
@@ -422,7 +428,14 @@ Hosting/provider/budget/region/domain; outbound recovery mail; backup/recovery t
 | Owner decision, 2026-11-02 | Users and contacts use one required `name` field; no separate first/last fields |
 | Owner decision, 2026-11-02 | Closed is the only completion status; remove Resolved and `resolved_at`, retain On Hold and the section 6 transition/reopening rules |
 | Owner decision, 2026-11-02 | Categories deferred beyond V1 |
-| Schema work | PostgreSQL baseline and checks implemented; Laravel application remains to be built |
+| Owner decision, 2026-11-02 | Tenant subdomains select independent tenant accounts; replace the proposed `/t/{tenant_slug}` routing |
+| Schema work | PostgreSQL baseline/forward workflow migration applied and checks passed; Laravel scaffold exists, business application remains to be built |
+| Verified on server, 2026-11-02 | Provisioning tests passed (17 tests, 59 assertions); Janci Tech created with slug `jancitech`; browser authentication still unbuilt |
+| Owner capacity, 2026-11-02 | Daily sprint schedule assumes four focused hours per workday; relative-day forecast includes explicit contingency |
 | Git upload request | Baseline plan/schema/setup notes/tests uploaded to repository `main` in commit `7f46fd0` |
 
 Additional product confirmations will be added here after the owner answers. Code existence and prior upload do not imply confirmation of every provisional product default.
+
+## 21. Daily execution schedule
+
+Use [SPRINT_SCHEDULE.md](SPRINT_SCHEDULE.md) for the completed-work inventory, all 45 daily tasks and exit conditions, contingency allocation, decision deadlines, and coverage of M0–M7. The next execution slice is tenant lookup/context and subdomain-aware login. No scheduled day is automatically authorized to publish production without owner release approval.
