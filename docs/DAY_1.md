@@ -15,7 +15,7 @@ not tracked automatically. Status: **implementation prepared; CI/server gates pe
 | Minimal CI baseline | Prepared | PostgreSQL 18 service, separate roles, fresh migrations, SQL regressions, PHP tests with fail-on-skipped, Pint and asset build |
 | CI execution | Pending | Workflow must actually complete successfully on the Day 1 PR |
 | Existing server verification | Pending | Owner pulls the Day 1 branch, grants runtime test access, runs checks without changing the real tenant |
-| Day 1 PR review/merge | Pending | Review exact diff and green checks before merging the Day 1 changes; do not confuse the already-merged foundation with this new PR |
+| Day 1 PR review/merge | Draft PR open | [PR #2](https://github.com/skrall3119/HelpDesk/pull/2); review exact diff and green checks before merging; the foundation itself is already merged |
 
 ## Existing-server verification
 
@@ -57,6 +57,7 @@ The next slice is Day 2's restricted tenant lookup, after this baseline's gate p
 
 - Local authoring workspace: no PHP/PostgreSQL executables available; no local
   PHPUnit/Pint/SQL pass is claimed. Static file/format review alone is insufficient.
-- CI run URL and outcome: pending.
+- Static checks: JSON/YAML parsed, workflow shell blocks passed `bash -n`, whitespace reviewed; only Composer setup scripts changed.
+- CI run URL and outcome: [initial run](https://github.com/skrall3119/HelpDesk/actions/runs/41524312344) started; final result pending.
 - Server command results: pending.
 - Review/merge evidence for Day 1 PR: pending.
