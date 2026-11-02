@@ -239,15 +239,17 @@ Framework tables for sessions, password-reset tokens, jobs/cache, and migration 
 
 ### Tenant routing and bootstrap
 
-Working default routes live under `/t/{tenant_slug}`. Login uses the organization slug plus email/password; the same email may exist in different tenants. Do not offer public tenant creation in V1. Provision tenants and their first administrator using a controlled CLI command, with no default/shared passwords.
+**Confirmed:** tenant routes use `{tenant_slug}.{base_domain}`, such as `acme.example.com`; there is no `/t/{tenant_slug}` prefix. The subdomain selects the tenant, and login uses that tenant's independent email/password account; the same email may exist in different tenants. Do not offer public tenant creation in V1. Provision tenants and their first administrator using a controlled CLI command, with no default/shared passwords.
 
 The current RLS design cannot resolve an unknown tenant ID from its slug through the ordinary tenant policy. Implement and test a narrowly scoped tenant lookup function returning only ID and active status for an exact slug. If using SECURITY DEFINER, use a dedicated least-privilege owner, fixed safe search path, qualified objects, restricted EXECUTE grants, and no general table-write/admin privileges. The migration or maintenance superuser must never be the web connection. This is a required implementation task, not an existing function.
 
+Working implementation defaults: validate hosts against the configured base domain, keep session cookies host-only (`SESSION_DOMAIN` unset/null), and generate login/recovery URLs for the resolved tenant host. Local testing can use `acme.localhost:8000` through the existing SSH tunnel; verify hostname resolution on the user's browser. The production base domain and wildcard DNS/TLS remain deployment decisions. Subdomain selection never substitutes for tenant authorization or PostgreSQL context.
+
 ### Request sequence
 
-1. Resolve the tenant from the route through the restricted lookup path; provide generic failures and rate limits to reduce tenant/account enumeration.
+1. Resolve the tenant slug from an exact single-label subdomain of the configured base domain, then resolve the tenant through the restricted lookup path; provide generic failures and rate limits to reduce tenant/account enumeration.
 2. Start the domain transaction on the runtime connection; set `app.tenant_id` locally before fetching tenant/user/domain rows.
-3. Authenticate/reload the session user inside that tenant. Verify active tenant, active/nondeleted user, and session tenant match. Bind authenticated identity to the session; switching the slug must never change a logged-in user's tenant.
+3. Authenticate/reload the session user inside that tenant. Verify active tenant, active/nondeleted user, and session tenant match. Bind authenticated identity to the session; switching the tenant subdomain must never change a logged-in user's tenant.
 4. Set `app.user_id` from the authenticated user before any ticket write; perform policy checks before actions.
 5. Commit only successful operations; roll back failures. Never stream/lazily load protected rows after the context transaction ends.
 
@@ -269,7 +271,7 @@ RLS enforces tenant boundaries; policies enforce capabilities, active-record eli
 
 | Screen | Required behavior and acceptance |
 | --- | --- |
-| Tenant login/recovery | Slug-aware login; clear validation; generic authentication errors; safe redirects |
+| Tenant login/recovery | Subdomain-scoped login; clear validation; generic authentication errors; safe redirects |
 | Ticket dashboard | All/My/Unassigned views; hide On Hold/Closed/deleted by default; status filters, search, pagination, newest first |
 | New ticket | Active client picker, dependent contact picker, subject/description, priority, authorized assignment |
 | Ticket detail | Number, status, priority, current client/contact, assignee/creator, description, internal comments, activity |
@@ -290,7 +292,7 @@ Provide loading, empty, validation, forbidden/not-found, and conflict states; ke
 
 ## 13. HTTP/application interface
 
-V1 serves authenticated browser routes, not a public API. Proposed route families under `/t/{tenant_slug}`:
+V1 serves authenticated browser routes, not a public API. Route families on each `{tenant_slug}.{base_domain}` host:
 
 | Route/action family | Responsibility |
 | --- | --- |
@@ -422,6 +424,7 @@ Hosting/provider/budget/region/domain; outbound recovery mail; backup/recovery t
 | Owner decision, 2026-11-02 | Users and contacts use one required `name` field; no separate first/last fields |
 | Owner decision, 2026-11-02 | Closed is the only completion status; remove Resolved and `resolved_at`, retain On Hold and the section 6 transition/reopening rules |
 | Owner decision, 2026-11-02 | Categories deferred beyond V1 |
+| Owner decision, 2026-11-02 | Tenant subdomains select independent tenant accounts; replace the proposed `/t/{tenant_slug}` routing |
 | Schema work | PostgreSQL baseline and checks implemented; Laravel application remains to be built |
 | Git upload request | Baseline plan/schema/setup notes/tests uploaded to repository `main` in commit `7f46fd0` |
 
