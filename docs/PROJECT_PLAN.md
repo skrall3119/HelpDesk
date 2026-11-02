@@ -1,8 +1,8 @@
 # CaseLantern — Project Plan
 
-Last updated: 2026-10-26
+Last updated: 2026-11-02
 
-This is the authoritative product and implementation plan. The older lowercase `project_plan.md` is historical. The PostgreSQL migration is the authority for database behavior; this plan also describes application behavior that has not been built yet.
+This is the authoritative product and implementation plan. The older lowercase `project_plan.md` is historical. The PostgreSQL migration describes currently implemented database behavior; confirmed product decisions in this plan define the target behavior. Where they differ, the schema must be reconciled before affected application work. This plan also describes application behavior that has not been built yet.
 
 **Decision labels:** **Confirmed** comes from prior discussion. **Implemented** describes existing repository artifacts, not a finished application. **Working default** is an engineering/product recommendation that allows planning to proceed and may be revised. **Pending answer** identifies a question currently with the owner. Working defaults are not retroactive user approvals.
 
@@ -12,14 +12,14 @@ CaseLantern is a multi-tenant support application. A tenant is a support organiz
 
 The first usable release lets an organization maintain clients/contacts, record issues, share responsibility, and preserve the investigation and change history. A technician sees all tickets in their tenant, claims unassigned work, records internal comments, and progresses issues to completion. Managers coordinate assignments. Administrators also manage employees and organization settings.
 
-Success means a new organization can be provisioned, its administrator can add employees and clients, and a ticket can be created, claimed, investigated, resolved, closed, and reviewed without losing history or exposing another tenant's data.
+Success means a new organization can be provisioned, its administrator can add employees and clients, and a ticket can be created, claimed, investigated, closed, and reviewed without losing history or exposing another tenant's data.
 
 ## 2. Current repository status
 
 | Artifact | Status | Meaning |
 | --- | --- | --- |
 | Product requirements and initial decisions | Documented | Confirmed rules are retained below |
-| PostgreSQL domain schema | Implemented | Seven tables, constraints, indexes, triggers, tenant policies |
+| PostgreSQL domain schema | Implemented | Seven tables, constraints, indexes, triggers, tenant policies; name/status reconciliation required |
 | Database checks | Implemented; previously passed on PostgreSQL 17 | Constraints, audit behavior, and non-owner RLS checks |
 | Laravel application and frontend | Not started | No application scaffold or dependency manifests |
 | Authentication and capability policies | Not started | Database role values are not application authorization |
@@ -50,7 +50,7 @@ The schema does not by itself implement a usable or production-ready SaaS applic
 
 ### Working default: later releases
 
-Categories and reports are pending the owner's scope answer. The plan currently defers them. Attachments, public registration, billing/subscriptions, client portals, email-to-ticket, outbound ticket notifications, SLAs, teams, custom roles, multiple addresses, AI features, integrations, and public APIs are outside V1.
+**Confirmed:** categories are deferred beyond V1. No category management, ticket category field, category filters, or category schema is required in V1. Reports remain deferred under the existing scope default. Attachments, public registration, billing/subscriptions, client portals, email-to-ticket, outbound ticket notifications, SLAs, teams, custom roles, multiple addresses, AI features, integrations, and public APIs are outside V1.
 
 Account-recovery email is infrastructure for authentication and is separate from deferred ticket email integration. If outbound email is unavailable in a development environment, use a local mail sink; production recovery must work before release.
 
@@ -65,7 +65,7 @@ Implement Laravel policies/gates with a centralized capability map. Controllers,
 | View all live tenant tickets and current client/contact details | Yes | Yes | Yes |
 | Create/edit tickets and original descriptions | Yes | Yes | Yes |
 | Add internal comments | Yes | Yes | Yes |
-| Change status/priority; resolve/close assigned tickets | Yes | Yes | Yes; workflow question below |
+| Change status/priority; close assigned tickets | Yes | Yes | Yes; workflow question below |
 | Claim unassigned ticket for self | Yes | Yes | Yes |
 | Assign/reassign to another eligible employee | Yes | Yes | No |
 | Remove assignment from unfinished ticket | Working default: yes | Working default: yes | No |
@@ -88,7 +88,7 @@ Users cannot change their own tenant, promote themselves through profile editing
 - Every technician can see all live tickets in their tenant. Assignment indicates responsibility, not visibility.
 - Technicians can claim an unassigned ticket only for themselves. They cannot take another person's assigned ticket, reassign to someone else, or delete tickets.
 - Managers/administrators may assign and reassign work within their tenant.
-- Every resolved or closed ticket must have an assignee.
+- Every closed ticket must have an assignee.
 - A ticket requires a client and a contact belonging to that client and tenant.
 - A client may have multiple contacts and one address. Client contact records have no V1 login.
 - Ticket pages show current contact information; historical contact snapshots are not required.
@@ -97,21 +97,33 @@ Users cannot change their own tenant, promote themselves through profile editing
 
 ## 6. Workflow, assignment, and concurrency
 
-### Status and priority defaults
+### Confirmed status workflow
 
-The schema implements these proposed values:
+The target workflow uses the following values. The current SQL baseline still contains `resolved` and lacks `on_hold`; reconcile its constraints, triggers, tests, and documentation with this confirmed workflow.
 
 | Stored status | Display label | Meaning |
 | --- | --- | --- |
 | `open` | Open | Newly reported issue |
 | `in_progress` | In Progress | Investigation/work underway |
 | `waiting_on_client` | Waiting on Client | Customer information/action needed |
-| `resolved` | Resolved | Support believes the issue is fixed |
+| `on_hold` | On Hold | Work paused for a reason other than waiting on the client |
 | `closed` | Closed | Work is finished |
 
 Priorities are `low`, `normal`, `high`, and `critical`; default is `normal`. Priority and status are independent.
 
-**Pending answer / working default:** all three roles may change any live ticket to any listed status. Completion always requires an assignee. Assignment does not itself change status. Reopening means changing resolved/closed to open, in progress, or waiting on client. There is no mandatory linear transition matrix. A same-status save creates no status-change event.
+**Confirmed:** Resolved and Closed are combined into **Closed**; there is no separate resolution status or resolution timestamp. All three roles may change status on any live tenant ticket, subject to assignment permissions. Closing requires an assignee. Assignment does not itself change status, and status changes preserve the assignee. A same-status save creates no status-change event.
+
+| Current status | Allowed next statuses |
+| --- | --- |
+| Open | In Progress, Waiting on Client, On Hold, Closed |
+| In Progress | Waiting on Client, On Hold, Closed |
+| Waiting on Client | In Progress, On Hold, Closed |
+| On Hold | In Progress, Waiting on Client, Closed |
+| Closed | In Progress |
+
+New tickets start Open and never transition back to Open. Reopening returns Closed tickets to In Progress and records a reopening event. Require a short reason for On Hold and reopening, and a closure note explaining the fix or why the request ended.
+
+The default dashboard hides On Hold, Closed, and soft-deleted tickets. Status filters can show On Hold and Closed; deleted tickets use a separate restricted view.
 
 ### Assignment operations
 
@@ -119,7 +131,7 @@ Use separate actions for claim, manager assignment, and unassignment; do not all
 
 - Claim: derive actor/tenant from authentication, require a live unassigned ticket and active actor, and use one conditional UPDATE. Exactly one successful claimant; a loser receives a friendly conflict and the current assignee.
 - Reassign: authorize manager/administrator, validate the target in the tenant, lock the ticket row, then save and audit in one transaction.
-- Unassign: working default permits managers/administrators on unfinished tickets. For resolved/closed tickets, require reopening in the same authorized transaction before clearing assignment.
+- Unassign: working default permits managers/administrators on unfinished tickets. For closed tickets, require reopening in the same authorized transaction before clearing assignment.
 - Completion: lock/recheck the current ticket and assignee; do not trust values from an old browser form.
 - Inactive/deleted assignees remain visible historically. Unfinished work should be reassigned by a manager; a deactivated user cannot log in or receive new assignments.
 
@@ -127,18 +139,18 @@ Use row locking or conditional updates against an expected version for concurren
 
 ### Completion timestamps
 
-Implemented triggers fill `resolved_at` for resolved/closed tickets and `closed_at` for closed tickets. Reopening clears current completion timestamps; previous values remain in ticket history. Application forms must not accept user-supplied completion timestamps, creator, tenant, identity, or ticket number.
+Target behavior: closing sets `closed_at`; reopening clears it while retaining previous closures in ticket history. Remove `resolved_at` from the target schema. The existing baseline's resolution/completion triggers must be updated to match. Application forms must not accept user-supplied completion timestamps, creator, tenant, identity, or ticket number.
 
 ## 7. Clients, contacts, and validation
 
-Working defaults align with the existing schema:
+Confirmed name model: users and contacts each have one required `name` field. People may include their full name in that field; separate first/last name fields are not required. The existing SQL baseline must be reconciled accordingly. Other input requirements below remain working defaults unless otherwise confirmed.
 
 | Entity | Required input | Optional input |
 | --- | --- | --- |
 | Tenant | Name, URL-safe unique slug during provisioning | None for initial setup |
-| User | First/last name, tenant-unique email, role, secure password setup | Remember-me preference |
+| User | One nonblank `name`, tenant-unique email, role, secure password setup | Remember-me preference |
 | Client | Name, type (`individual` or `business`) | Email, phone, one address |
-| Contact | Client, first/last name | Email, phone, job title, primary flag |
+| Contact | Client, one nonblank `name` | Email, phone, job title, primary flag |
 | Ticket | Client, matching contact, subject, description | Assignee; status/priority have defaults |
 | Comment | Ticket and nonblank body | None |
 
@@ -167,19 +179,19 @@ Activity is internal and contains potentially sensitive prior descriptions. Do n
 
 ## 9. Database model and ownership
 
-All primary keys are bigint identities generated by PostgreSQL. Timestamps are timezone-aware; store instants consistently and display them in the user's/browser's chosen timezone, using UTC as the fallback. The following reflects the current schema, replacing the earlier draft field names:
+All primary keys are bigint identities generated by PostgreSQL. Timestamps are timezone-aware; store instants consistently and display them in the user's/browser's chosen timezone, using UTC as the fallback. The following describes the target model. The current SQL baseline still uses separate user/contact names and separate resolution fields; reconcile those differences before application implementation:
 
 | Table | Main fields and responsibility |
 | --- | --- |
 | `tenants` | `id`, `name`, `slug`, `active`, `next_ticket_number`, timestamps |
-| `users` | Tenant, first/last name, `email`, hashed `password`, fixed `role`, active flag, `remember_token`, timestamps/deletion |
+| `users` | Tenant, single `name`, `email`, hashed `password`, fixed `role`, active flag, `remember_token`, timestamps/deletion |
 | `clients` | Tenant, type/name, email/phone, address, active flag, timestamps/deletion |
-| `contacts` | Tenant/client, names, email/phone/job title, primary/active flags, timestamps/deletion |
-| `tickets` | Tenant, generated tenant-specific number, client/contact, assignee/creator, status/priority, subject/description, lifecycle timestamps |
+| `contacts` | Tenant/client, single `name`, email/phone/job title, primary/active flags, timestamps/deletion |
+| `tickets` | Tenant, generated tenant-specific number, client/contact, assignee/creator, status/priority, subject/description, `closed_at`, creation/update/deletion timestamps |
 | `ticket_comments` | Tenant/ticket, author (`user_id`), body, timestamps/deletion |
 | `ticket_activities` | Tenant/ticket, actor (`user_id`), `activity_type`, JSONB `old_values`/`new_values`, creation time |
 
-There is no `roles` or `categories` table and no `category_id` field in the initial schema. There is no `password_hash` attribute; Laravel stores its secure hash in `password`. There are no historical contact snapshots.
+There is no `roles` or `categories` table and no `category_id` field in the initial schema. Categories are confirmed deferred beyond V1. There is no `password_hash` attribute; Laravel stores its secure hash in `password`. There are no historical contact snapshots.
 
 ```mermaid
 erDiagram
@@ -258,7 +270,7 @@ RLS enforces tenant boundaries; policies enforce capabilities, active-record eli
 | Screen | Required behavior and acceptance |
 | --- | --- |
 | Tenant login/recovery | Slug-aware login; clear validation; generic authentication errors; safe redirects |
-| Ticket dashboard | All/My/Unassigned views, live tickets, filters/search, pagination, newest first |
+| Ticket dashboard | All/My/Unassigned views; hide On Hold/Closed/deleted by default; status filters, search, pagination, newest first |
 | New ticket | Active client picker, dependent contact picker, subject/description, priority, authorized assignment |
 | Ticket detail | Number, status, priority, current client/contact, assignee/creator, description, internal comments, activity |
 | Edit ticket | Preserve input on validation errors; stale-write conflict; dependent client/contact validation |
@@ -270,7 +282,7 @@ RLS enforces tenant boundaries; policies enforce capabilities, active-record eli
 
 Creation journey: employee chooses client → contact list updates → employee enters subject/description → save returns assigned ticket number and creation history. If no suitable contact exists, an authorized user adds one; the required-contact rule is never bypassed.
 
-Work journey: technician opens unassigned queue → claims ticket → changes status → adds internal investigation comments → resolves/closes once assigned. Other technicians can still review and comment.
+Work journey: technician opens unassigned queue → claims ticket → changes status → adds internal investigation comments → closes once assigned. Other technicians can still review and comment.
 
 Dashboard filters combine with AND; tabs add their assignment condition. Default sort is creation descending with ID as a deterministic tie-breaker. Working default page size is 25, capped at 100. Preserve filters in the URL. Search recognizes a plain/formatted exact ticket number and otherwise searches subject/description. Use allowlisted sort/filter values and debounce interactive search.
 
@@ -303,7 +315,7 @@ Use real PostgreSQL 17 for database/feature/integration tests; SQLite cannot val
 | Roles | Every capability allowed/denied per matrix, including forged assignment/role/tenant fields and deleted-ticket access |
 | Clients/contacts | Required fields, dependent picker, cross-client contact rejection, primary-contact race/restore conflict, current contact information on old tickets |
 | Assignment | Self-claim only; no technician reassignment; manager reassignment; inactive target rejection; two concurrent claims yield one winner |
-| Workflow | Every proposed transition, completion without assignee rejected, unassignment/completion race, reopen timestamps, inactive historical assignee behavior |
+| Workflow | Every allowed transition and rejected transition, closure without assignee rejected, unassignment/completion race, reopen timestamps, inactive historical assignee behavior |
 | History | Description before/after, actor, creation, reassignment, deletion/restoration; transaction rollback leaves no partial audit |
 | Edits/comments | Blank input rejection, escaped output, no generic-field bypass, stale-write conflict, no comment mutation UI |
 | Queries | All/My/Unassigned, combined filters, exact-number/full-text search, pagination, no deleted rows, deterministic ordering |
@@ -338,7 +350,7 @@ No calendar estimate is committed before the first slice establishes the develop
 
 ### First development session: M1 tasks
 
-1. Confirm available PHP/Composer/Node/Docker tooling and pin a compatible application toolchain.
+1. Reconcile the SQL baseline, tests, and database documentation with the confirmed single `name` fields and Closed-only completion workflow (including On Hold, transition rules, and `closed_at` behavior); preserve data with forward migrations if already applied to a shared environment. Then confirm available PHP/Composer/Node/Docker tooling and pin a compatible application toolchain.
 2. Scaffold the application without replacing the existing plan or database files.
 3. Reconcile framework authentication/infrastructure tables with the domain schema before running default migrations.
 4. Add a migration wrapper for the SQL baseline and a safe development provisioning path.
@@ -366,7 +378,7 @@ V1 is ready when:
 
 - A fresh checkout starts using documented commands with no hidden manual database edits.
 - A controlled operator provisions an organization and administrator without shared/default credentials.
-- Administrator creates an employee; a client/contact and ticket are created; technician claims, comments, resolves/closes; manager reassigns and deletes/restores.
+- Administrator creates an employee; a client/contact and ticket are created; technician claims, comments, closes; manager reassigns and deletes/restores.
 - The same workflows work independently for a second tenant with overlapping employee emails.
 - Capability, RLS, recovery, concurrency, stale-write, and audit tests pass using production-like roles.
 - Search/filter/pagination and inactive/deleted-record behavior match this plan.
@@ -380,10 +392,10 @@ V1 is ready when:
 | ID | Question | Recommended working default | Affected work |
 | --- | --- | --- | --- |
 | Q1 — confirmed | Can technicians create/edit clients and contacts? | Yes; only managers/admins deactivate/restore | M3 policies and controls |
-| Q2 | Who can resolve, close, and reopen tickets? | Any internal employee on any live tenant ticket; completion needs an assignee; any listed status transition allowed | M5 policies/workflow |
-| Q3 | Include categories/reports/comment editing in first release? | Defer categories and reports; comments append-only | M3–M6 scope/schema |
+| Q2 — confirmed | Who can close and reopen tickets? | All three internal roles; closure requires an assignee; enforce the transition matrix in section 6 | M5 policies/workflow |
+| Q3 — categories confirmed | Include categories/reports/comment editing in first release? | Categories deferred beyond V1; reports remain deferred and comments append-only under existing working defaults | M3–M6 scope/schema |
 
-Answers override the corresponding working defaults throughout this plan. If categories/reports are included, define category management, report measures, filters, and access before adding schema/UI.
+Answers override the corresponding working defaults throughout this plan. Categories are outside V1. If introduced in a later release, define category management and access before adding schema/UI. Any later report scope requires measures, filters, and access rules.
 
 ### Defaults available for review; do not block scaffolding
 
@@ -396,17 +408,20 @@ Hosting/provider/budget/region/domain; outbound recovery mail; backup/recovery t
 ## 20. Confirmed decision record
 
 | Source | Decision |
-| Owner decision, 2026-10-26 | Product renamed to CaseLantern; machine-readable project name is `caselantern` |
 | --- | --- |
+| Owner decision, 2026-10-26 | Product renamed to CaseLantern; machine-readable project name is `caselantern` |
 | Prior product discussion | Tenant is a support organization; clients/contacts receive its services |
 | Prior product discussion | Internal employees only; one tenant per employee; three fixed roles |
 | Prior product discussion | Technicians see all tenant tickets and claim only unassigned tickets for themselves |
 | Prior product discussion | Managers/admins may reassign; managers may delete tickets |
-| Prior product discussion | An assignee is required before resolution/closure |
+| Prior product discussion | An assignee is required before closure |
 | Prior product discussion | Every ticket has a matching client/contact; show current contact data |
 | Prior product discussion | One client address; editable original descriptions; internal-only separate comments |
 | Prior product discussion | Technician report access disabled by default; future custom permissions possible |
 | Owner answer, 2026-10-26 | Technicians may create/edit clients and contacts; only managers/admins deactivate or restore them |
+| Owner decision, 2026-11-02 | Users and contacts use one required `name` field; no separate first/last fields |
+| Owner decision, 2026-11-02 | Closed is the only completion status; remove Resolved and `resolved_at`, retain On Hold and the section 6 transition/reopening rules |
+| Owner decision, 2026-11-02 | Categories deferred beyond V1 |
 | Schema work | PostgreSQL baseline and checks implemented; Laravel application remains to be built |
 | Git upload request | Baseline plan/schema/setup notes/tests uploaded to repository `main` in commit `7f46fd0` |
 
