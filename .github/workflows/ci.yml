@@ -1,0 +1,114 @@
+name: Development baseline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baseline-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    name: PHP and PostgreSQL baseline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-postgres-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    # Synthetic credentials for this disposable runner only; no server secrets.
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_DATABASE: caselantern_provisioning_test
+      DB_USERNAME: caselantern_app
+      DB_PASSWORD: ci-runtime-only
+      DB_MIGRATION_USERNAME: caselantern_migrator
+      DB_MIGRATION_PASSWORD: ci-migration-only
+      CASELANTERN_TEST_DATABASE: caselantern_provisioning_test
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: log
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: ci-postgres-only
+      PGDATABASE: postgres
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: pdo_pgsql, pdo_sqlite, mbstring, dom, xml, xmlwriter, fileinfo
+          tools: composer:v2
+          coverage: none
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: |
+          composer validate --no-check-publish
+          composer install --no-interaction --prefer-dist --no-progress
+          composer check-platform-reqs
+          npm ci
+
+      - name: Configure disposable application
+        run: |
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+
+      - name: Bootstrap distinct PostgreSQL roles and databases
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f database/setup/development-roles.sql
+          psql -X -v ON_ERROR_STOP=1 -c "ALTER ROLE caselantern_migrator PASSWORD 'ci-migration-only';"
+          psql -X -v ON_ERROR_STOP=1 -c "ALTER ROLE caselantern_app PASSWORD 'ci-runtime-only';"
+          createdb -O caselantern_migrator caselantern_provisioning_test
+          createdb -O caselantern_migrator caselantern_upgrade_test
+
+      - name: Apply Laravel migrations as owner and runtime grants
+        run: |
+          php artisan migrate --database=pgsql_migrator --force --no-interaction
+          PGDATABASE=caselantern_provisioning_test psql -X -v ON_ERROR_STOP=1 -f database/setup/runtime-grants.sql
+
+      - name: SQL schema and upgrade regressions
+        run: |
+          PGDATABASE=caselantern_provisioning_test psql -X -v ON_ERROR_STOP=1 -f database/tests/schema.sql
+          PGDATABASE=caselantern_upgrade_test psql -X -v ON_ERROR_STOP=1 -c 'SET ROLE caselantern_migrator;' -f database/migrations/001_initial.sql
+          PGDATABASE=caselantern_upgrade_test psql -X -v ON_ERROR_STOP=1 -f database/tests/upgrade.sql
+
+      - name: Application checks including mandatory real PostgreSQL tests
+        run: |
+          vendor/bin/pint --test app tests
+          vendor/bin/phpunit --fail-on-skipped
+
+      - name: Build frontend assets
+        run: npm run build
