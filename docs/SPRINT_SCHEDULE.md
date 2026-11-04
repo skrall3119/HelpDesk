@@ -1,12 +1,12 @@
 # CaseLantern — daily sprint schedule
 
-Planning baseline: 2026-11-02. Capacity confirmed by the owner: **4 focused hours per workday**.
+Planning baseline: 2026-11-02; API-centric revision: 2026-11-03. Capacity confirmed by the owner: **4 focused hours per workday**.
 
 This is a forecast, not a delivery guarantee. Plan **45 workdays / 180 hours**:
 40 planned delivery days (160 hours) plus five contingency days (20 hours).
 At five workdays per week this is approximately nine weeks; weekends, holidays,
 and missed sessions extend elapsed time. Day 1 means the next agreed development
-session, not a fixed calendar date. Reforecast after Sprint 1 using actual results.
+session, not a fixed calendar date. The 45-day/180-hour total is retained as a provisional baseline, not a validated estimate for the API-centric revision. Re-estimate after the first API/authentication slice in Sprint 1, including contract and client work; move downstream days if required.
 
 The target is the agreed **V1 through a verified release**, not the later-release
 backlog. This schedule supplements [PROJECT_PLAN.md](PROJECT_PLAN.md), which owns
@@ -48,16 +48,20 @@ real non-owner PostgreSQL tests as required gates.
 - Restore the previously accepted comment rule: authors edit their own comments,
   managers/admins soft-delete, and revisions are retained. The later append-only
   draft was a working default, not an approval overriding those decisions.
-- Build authentication/context before business CRUD. Add authorization and tests
+- **Confirmed (2026-11-03): fully API-centric.** Authentication, session/current-user/capabilities, recovery/setup, every data load, and every form submission/mutation use documented HTTP APIs. Frontend pages are API clients; no Blade/Livewire business-data or mutation bypass is allowed.
+- Build API contracts/client foundation and authentication/context before business CRUD. Add authorization and tests
   with each feature rather than deferring them to a final security phase.
 - Reuse existing SQL numbering, workflow, and audit triggers; do not create a
   competing audit system or reimplement the database schema from scratch.
 - Keep the existing native server workflow. Docker Compose is optional portability
-  work, not a prerequisite. Keep one application, Blade/Tailwind, and Livewire only
-  where interactive forms/filters benefit from it.
+  work, not a prerequisite. Keep one Laravel application and Tailwind; Blade may serve
+  the static shell/assets only. Choose and document the frontend client approach
+  in Sprint 1; a separate deployment or new frontend framework is not required.
+  Livewire is no longer a planned dependency.
 - Categories, reports, attachments, public signup, billing, client portal,
   email-to-ticket, ticket notifications, SLAs, teams/custom roles, AI, integrations,
-  and public APIs remain outside V1. Recovery/setup email remains in scope.
+  and third-party API access/programs remain outside V1. The full application API
+  is required in V1. Recovery/setup email remains in scope.
 
 ## Daily operating rule
 
@@ -67,21 +71,23 @@ and a small commit. On design/infrastructure days the same budget covers the
 relevant proof rather than forcing a code deliverable. Tests belong inside these
 estimates; final checks do not replace the daily checks.
 
+Every feature day includes its API endpoint and OpenAPI contract, direct HTTP success/denial/validation tests, and UI integration through the shared API client. All initial data, lookup options, history, searches, and submissions must use APIs. Check JSON errors, authorization, tenant isolation, and applicable conflicts at the endpoint; verify browser network behavior. A UI-only or undocumented endpoint slice is incomplete.
+
 Stop dependent work when an exit condition fails. Use the next contingency slot
 for genuine overruns; do not silently drop tenant tests or product behavior.
 If a contingency slot is unused, pull forward the next scheduled task.
 
-## Sprint 1 — tenant-aware login (Days 1–5, 20 hours)
+## Sprint 1 — API foundation and tenant-aware login (Days 1–5, 20 hours)
 
 | Day | Work within the four-hour block | Exit condition / proof |
 | --- | --- | --- |
 | 1 | Review/merge the existing foundation through the repository's chosen review process; reconcile approved requirements; document server start/test/migration commands; establish a minimal PostgreSQL CI job and reusable A/B test fixtures | Foundation is recoverable from Git; CI skeleton runs; no server-only credential or schema dependency is hidden |
-| 2 | Add the narrowly scoped tenant-by-slug lookup and forward migration/grants; use fixed safe search path and least-privilege ownership for any SECURITY DEFINER function | Runtime can resolve only the intended lookup fields; unknown/disabled tenant handling and privilege boundaries tested |
-| 3 | Configure base domain, strict subdomain parsing/trusted hosts, and request transaction/context middleware; order it before binding/auth queries and clear context on every completion/failure | Two-host requests and reused connections remain isolated; missing context fails closed; no reads occur after transaction cleanup |
-| 4 | Adapt User model/provider for tenant email, active/deleted status; build login/logout, host-only sessions, generic credential errors, rate limiting, CSRF, and a protected landing page | A provisioned tenant can log in/out on its local subdomain; invalid credentials and inactive records fail safely |
-| 5 | Test cross-subdomain sessions, same email in two tenants, host tampering, deactivation on existing sessions, transaction failures, and local browser flow | Authentication/context tests pass with non-owner PostgreSQL credentials; owner sees a real protected tenant page |
+| 2 |Add the narrowly scoped tenant-by-slug lookup and forward migration/grants; use fixed safe search path and least-privilege ownership for any SECURITY DEFINER function; Define the initial OpenAPI contract, /api/v1 conventions, tenant/auth requirements, JSON errors/status codes, and session/CSRF bootstrap alongside lookup work |Runtime can resolve only the intended lookup fields; unknown/disabled tenant handling and privilege boundaries tested; Contract reviewed before authentication implementation |
+| 3 |Configure base domain, strict subdomain parsing/trusted hosts, and request transaction/context middleware; order it before binding/auth queries and clear context on every completion/failure; Register API middleware before binding/auth; build the minimal shared frontend API client for cookie credentials, CSRF, JSON errors, and expired sessions; document frontend tooling |Two-host requests and reused connections remain isolated; missing context fails closed; no reads occur after transaction cleanup; API failures are JSON; no HTML redirect fallback or cross-tenant bootstrap data |
+| 4 |Adapt User model/provider for tenant email, active/deleted status; build login/logout, host-only sessions, generic credential errors, rate limiting, CSRF, and a protected landing page; Expose login/logout/session-current-user-capabilities and CSRF bootstrap APIs; connect login form and landing-page data exclusively through the client |A provisioned tenant can log in/out on its local subdomain; invalid credentials and inactive records fail safely; Direct HTTP login/logout/session tests and browser network checks pass |
+| 5 |Test cross-subdomain sessions, same email in two tenants, host tampering, deactivation on existing sessions, transaction failures, and local browser flow; Verify API auth contracts, CSRF failures, 401/403/404/422/429 behavior and no alternate auth form handlers; re-estimate API/client effort |Authentication/context tests pass with non-owner PostgreSQL credentials; owner sees a real protected tenant page; Authentication works without UI; record revised forecast or evidence supporting the baseline |
 
-**Gate:** tenant identity comes from the validated host, authenticated identity
+**Gate:** documented authentication APIs work both via direct HTTP and the frontend; no browser handler bypasses the API. Tenant identity comes from the validated host, authenticated identity
 comes from the tenant's users, and neither can be changed by submitted form IDs.
 Re-estimate the remaining schedule now if this gate took longer than 20 hours.
 
@@ -89,25 +95,25 @@ Re-estimate the remaining schedule now if this gate took longer than 20 hours.
 
 | Day | Work within the four-hour block | Exit condition / proof |
 | --- | --- | --- |
-| 6 | Add tenant-scoped setup/reset token storage and broker behavior; forward migration; generic responses and expiry/single-use rules | Duplicate emails across tenants cannot share or redeem each other's tokens; raw tokens/passwords are not stored |
-| 7 | Build recovery/reset/setup screens and development mail capture; generate trusted tenant URLs and dispatch mail after commit | End-to-end reset works; replay, expired token, wrong tenant, and session invalidation checks pass |
-| 8 | Central capability map/policies; administrator employee list/create/edit and fixed-role validation; serialize last-active-admin changes | Managers/technicians cannot manage users or forge roles; concurrent demotion/deactivation cannot remove the last active admin |
-| 9 | Complete employee activation/deactivation and one-time setup mail; organization display-name settings; preserve attribution and flag unfinished work for reassignment | Deactivated employee loses access and new assignment eligibility; only administrator can change tenant settings; slug/counter remain protected |
+| 6 |Add tenant-scoped setup/reset token storage and broker behavior; forward migration; generic responses and expiry/single-use rules; Define recovery/reset/setup API schemas and token isolation tests |Duplicate emails across tenants cannot share or redeem each other's tokens; raw tokens/passwords are not stored; Recovery API contract covers generic responses and token failures |
+| 7 |Build recovery/reset/setup screens and development mail capture; generate trusted tenant URLs and dispatch mail after commit; Implement recovery/reset/setup APIs and API-backed forms |End-to-end reset works; replay, expired token, wrong tenant, and session invalidation checks pass; Direct HTTP and browser flows use the same endpoints |
+| 8 |Central capability map/policies; administrator employee list/create/edit and fixed-role validation; serialize last-active-admin changes; Implement employee list/detail/create/update APIs and API-backed admin screens |Managers/technicians cannot manage users or forge roles; concurrent demotion/deactivation cannot remove the last active admin; Role/last-admin rules hold through direct API requests |
+| 9 |Complete employee activation/deactivation and one-time setup mail; organization display-name settings; preserve attribution and flag unfinished work for reassignment; Implement employee lifecycle/setup and settings read/update APIs; wire every admin submission to them |Deactivated employee loses access and new assignment eligibility; only administrator can change tenant settings; slug/counter remain protected; Settings data and all admin mutations use APIs |
 | 10 | **Contingency 1:** fix authentication, recovery, or employee issues; otherwise advance Day 11 | Account-management demo passes before dependent business screens |
 
 **Gate:** an administrator can add an employee who sets a password and signs in;
 deactivation works across already-open sessions. Existing provisioning stays a
 controlled operator CLI, not public registration.
 
-## Sprint 3 — shared UI and clients/contacts (Days 11–15, 20 hours)
+## Sprint 3 — shared API client UI and clients/contacts (Days 11–15, 20 hours)
 
 | Day | Work within the four-hour block | Exit condition / proof |
 | --- | --- | --- |
-| 11 | Extend CI to run SQL upgrade/schema checks and application PostgreSQL tests with separate owner/runtime identities; Pint and asset build; make missing required integration configuration fail CI | A green CI run cannot be achieved merely by skipping PostgreSQL tests; fresh and upgraded schemas both checked |
-| 12 | Add compatible Livewire only for planned interactive controls; shared authenticated layout/navigation, forms, loading/error/empty states; carry tenant context through Livewire requests | Layout works on desktop/mobile; interactive endpoints cannot bypass tenant/auth middleware |
-| 13 | Client/contact models, input validation, forward constraints for nonblank contact method as needed; atomic CreateClientWithPrimaryContact and replacement rules | Failed contact creation leaves no client; every newly created client has a valid primary; cross-tenant/client references rejected |
-| 14 | Client list/search/detail/create/edit UI; business/individual type, one address, reusable individual/contact name entry; tenant-scoped authorization | All three roles can create/edit; no hard-delete control; posted IDs cannot cross tenants |
-| 15 | Additional contacts, edit/current details, transactional primary switching; prevent deactivating current primary without replacement; manager/admin lifecycle controls | Concurrent switches produce one active primary; name plus email/phone enforced; primary replacement and permission tests pass |
+| 11 |Extend CI to run SQL upgrade/schema checks and application PostgreSQL tests with separate owner/runtime identities; Pint and asset build; make missing required integration configuration fail CI; Add OpenAPI validation and API response/authorization tests to required CI |A green CI run cannot be achieved merely by skipping PostgreSQL tests; fresh and upgraded schemas both checked; Contract and HTTP regressions fail CI |
+| 12 | Complete shared API client, static shell/navigation and reusable API-backed forms/loading/error/empty states; use session/capabilities API for navigation; extend Sprint 1 foundation without Livewire business handlers | Desktop/mobile layout works; all initial data and submissions use documented APIs; no UI bypass of tenant/auth middleware |
+| 13 |Client/contact models, input validation, forward constraints for nonblank contact method as needed; atomic CreateClientWithPrimaryContact and replacement rules; Expose client-with-primary-contact creation and validation through the API |Failed contact creation leaves no client; every newly created client has a valid primary; cross-tenant/client references rejected; HTTP failure leaves neither record; JSON field errors tested |
+| 14 |Client list/search/detail/create/edit UI; business/individual type, one address, reusable individual/contact name entry; tenant-scoped authorization; Implement client list/search/detail/create/edit APIs and connect all screen data/forms |All three roles can create/edit; no hard-delete control; posted IDs cannot cross tenants; Network checks show every read/write uses documented endpoints |
+| 15 |Additional contacts, edit/current details, transactional primary switching; prevent deactivating current primary without replacement; manager/admin lifecycle controls; Implement contact reads/edits, primary switching and lifecycle APIs |Concurrent switches produce one active primary; name plus email/phone enforced; primary replacement and permission tests pass; API race and permission tests pass |
 
 **Gate:** an employee can create a client with a reachable primary contact and add
 another contact without breaking tenant relationships or lifecycle rules.
@@ -116,10 +122,10 @@ another contact without breaking tenant relationships or lifecycle rules.
 
 | Day | Work within the four-hour block | Exit condition / proof |
 | --- | --- | --- |
-| 16 | Finish client/contact deactivate/reactivate actions and tests; preserve historical links; separate active selection from historical display | Inactive entities cannot be selected on new tickets; preserved history stays readable; technicians cannot deactivate clients/contacts |
-| 17 | Ticket model/actions/validation; immutable tenant/creator/number fields; mandatory client/contact; default Open/Normal; database numbering and audit integration | A runtime-credential test creates a valid ticket with one number/creation event; mismatched contact and forged fields rejected |
-| 18 | New ticket form with dependent client/contact picker; ticket list/detail with current contact, number, priority, assignment, timestamps | Owner can create/open a real tenant ticket; missing contact cannot be bypassed; old ticket shows updated contact information |
-| 19 | Ticket/description editing and safe client/contact changes; atomic expected-version check for stale forms; field-level validation | Stale browser cannot overwrite newer work; description changes retain actor/time/old/new content once in existing audit |
+| 16 |Finish client/contact deactivate/reactivate actions and tests; preserve historical links; separate active selection from historical display; Expose deactivate/reactivate and active-picker reads through APIs |Inactive entities cannot be selected on new tickets; preserved history stays readable; technicians cannot deactivate clients/contacts; Historical and eligible-selection responses remain distinct and tenant-safe |
+| 17 |Ticket model/actions/validation; immutable tenant/creator/number fields; mandatory client/contact; default Open/Normal; database numbering and audit integration; Define and implement ticket create/read contracts and API resource fields |A runtime-credential test creates a valid ticket with one number/creation event; mismatched contact and forged fields rejected; Direct HTTP creation exercises numbering, audit and forbidden fields |
+| 18 |New ticket form with dependent client/contact picker; ticket list/detail with current contact, number, priority, assignment, timestamps; Load ticket lists/details and client/contact picker options via APIs; submit creation through API |Owner can create/open a real tenant ticket; missing contact cannot be bypassed; old ticket shows updated contact information; No server-hydrated business data; dependent picker requests are tenant-scoped |
+| 19 |Ticket/description editing and safe client/contact changes; atomic expected-version check for stale forms; field-level validation; Implement ticket PATCH API with atomic expected-version input and 409 conflict response |Stale browser cannot overwrite newer work; description changes retain actor/time/old/new content once in existing audit; Direct HTTP stale-write tests and UI conflict handling pass |
 | 20 | **Contingency 2:** stabilize client/ticket creation and first browser demo; otherwise advance Day 21 | Create/view/edit journey passes before assignment/workflow work |
 
 **Gate:** users can create and correct tickets with valid contact relationships,
@@ -129,11 +135,11 @@ current contact details, stable numbering, and an inspectable history.
 
 | Day | Work within the four-hour block | Exit condition / proof |
 | --- | --- | --- |
-| 21 | Atomic technician self-claim; manager/admin assign/reassign/unassign; active target validation; conflict response and UI | Technician cannot take another assignee or assign someone else; closed tickets retain an assignee; losers of claims get a clear conflict |
-| 22 | Status/priority forms and domain actions; reason/closure-note validation; transaction-local reason; Closed/reopen timestamp behavior | Full approved transition matrix and negative cases pass; On Hold/close/reopen reasons appear once in audit; assignment preserved |
-| 23 | Internal comment add/edit actions and revision storage forward migration; author-only editing and manager/admin soft deletion; stale-edit protection | Old comment bodies, actor, and time survive edits/deletion; other technicians cannot edit/delete someone else's comments |
-| 24 | Comment editor and readable mixed timeline; audit labels/diffs, reasons, revision display, stable chronological pagination; handle legacy snapshot fields | Work history is readable, escaped, tenant-scoped, and not duplicated; internal-only content has no public delivery path |
-| 25 | Ticket soft-delete, restricted deleted-ticket list/detail and restore; retain status, assignee, comments, and audit history | Manager/admin delete/restore works; technicians cannot reach deleted tickets by UI or direct request |
+| 21 |Atomic technician self-claim; manager/admin assign/reassign/unassign; active target validation; conflict response and UI; Expose dedicated claim/assignment/unassignment APIs consumed by the UI |Technician cannot take another assignee or assign someone else; closed tickets retain an assignee; losers of claims get a clear conflict; Concurrent HTTP claims yield one winner and a safe 409 response |
+| 22 |Status/priority forms and domain actions; reason/closure-note validation; transaction-local reason; Closed/reopen timestamp behavior; Expose status/priority APIs and connect forms; document reason requirements |Full approved transition matrix and negative cases pass; On Hold/close/reopen reasons appear once in audit; assignment preserved; HTTP transition/validation tests match the approved matrix |
+| 23 |Internal comment add/edit actions and revision storage forward migration; author-only editing and manager/admin soft deletion; stale-edit protection; Expose comment creation/edit/soft-delete APIs and revision contracts |Old comment bodies, actor, and time survive edits/deletion; other technicians cannot edit/delete someone else's comments; Ownership and stale-edit denials pass through HTTP |
+| 24 |Comment editor and readable mixed timeline; audit labels/diffs, reasons, revision display, stable chronological pagination; handle legacy snapshot fields; Load paginated comments/revisions/activity via APIs; submit editor through API |Work history is readable, escaped, tenant-scoped, and not duplicated; internal-only content has no public delivery path; Timeline data and editor submissions have no alternate backend path |
+| 25 |Ticket soft-delete, restricted deleted-ticket list/detail and restore; retain status, assignee, comments, and audit history; Expose deleted-ticket list/detail, delete and restore APIs |Manager/admin delete/restore works; technicians cannot reach deleted tickets by UI or direct request; Direct API requests enforce restricted access |
 
 **Gate:** a technician can create → claim → investigate/comment → hold/resume →
 close → reopen; managers can coordinate and restore work without losing history.
@@ -143,9 +149,9 @@ close → reopen; managers can coordinate and restore work without losing histor
 | Day | Work within the four-hour block | Exit condition / proof |
 | --- | --- | --- |
 | 26 | Exercise real concurrent claim/reassignment/closure/unassignment and stale-comment/description writes with separate connections; fix exposed races | Exactly one claim winner; closure cannot lose its required assignee; rollback leaves no partial audit or revisions |
-| 27 | All/My/Unassigned dashboard; combine status/priority/client/assignee filters; default hides On Hold/Closed/deleted; show reassignment-needed work | Assignment indicates responsibility, not visibility; explicit status filters retrieve paused/closed work; deleted view remains restricted |
-| 28 | Exact formatted/plain number and existing full-text subject/description search; deterministic sorting, URL-persisted filters, bounded pagination | Search/filter combinations are tenant-scoped; no accidental promise of comment/substring search; malformed sort/filter values rejected |
-| 29 | Realistic synthetic datasets, query plans/N+1 review, bounded timeline/list reads; tune only demonstrated slow paths | Main screens stay responsive with recorded query evidence; no speculative indexing or premature service split |
+| 27 |All/My/Unassigned dashboard; combine status/priority/client/assignee filters; default hides On Hold/Closed/deleted; show reassignment-needed work; Implement dashboard API queries and frontend loading states |Assignment indicates responsibility, not visibility; explicit status filters retrieve paused/closed work; deleted view remains restricted; All tabs and filters load API data only |
+| 28 |Exact formatted/plain number and existing full-text subject/description search; deterministic sorting, URL-persisted filters, bounded pagination; Document and test search/filter/sort/pagination API query contracts |Search/filter combinations are tenant-scoped; no accidental promise of comment/substring search; malformed sort/filter values rejected; Bounded results and invalid query errors verified through HTTP |
+| 29 |Realistic synthetic datasets, query plans/N+1 review, bounded timeline/list reads; tune only demonstrated slow paths; Measure endpoint query counts, response size and latency with synthetic data |Main screens stay responsive with recorded query evidence; no speculative indexing or premature service split; API lists/timelines remain bounded without leaking fields |
 | 30 | **Contingency 3:** fix workflow/dashboard issues; otherwise advance Day 31; run full internal demo | Feature-complete internal help desk beta; remaining work is cross-cutting verification and release preparation |
 
 **Gate:** the V1 product loop is usable, including search, history, and privileged
@@ -155,9 +161,9 @@ recovery. This is an internal beta, not approval to accept production customers.
 
 | Day | Work within the four-hour block | Exit condition / proof |
 | --- | --- | --- |
-| 31 | Complete cross-feature capability/tenant matrix: direct URLs, forged IDs, missing/reused context, inactive records, Livewire, session host mismatch | Required allow/deny combinations pass on production-like runtime credentials; no unexpected public mutation route |
-| 32 | Browser automation/smoke journeys for login, employee setup, client, ticket, closure, recovery, delete/restore; keyboard/focus/mobile checks | Repeatable owner journeys pass; accessible labels, focus, and status text do not depend on color alone |
-| 33 | Resolve shared validation/error/empty/loading inconsistencies; timezone display; safe logs; no lazy protected reads after transaction end; dependency/asset review | Errors preserve safe input without exposing secrets or another tenant; frontend and PHP checks pass |
+| 31 |Complete cross-feature capability/tenant matrix: direct URLs, forged IDs, missing/reused context, inactive records, all API routes, session host mismatch; Audit route inventory against OpenAPI and UI operations; reject alternate business/auth web handlers |Required allow/deny combinations pass on production-like runtime credentials; no unexpected public mutation route; Every application operation has API coverage; session expiry/CSRF errors remain JSON |
+| 32 |Browser automation/smoke journeys for login, employee setup, client, ticket, closure, recovery, delete/restore; keyboard/focus/mobile checks; Assert browser network use of APIs for every auth/data/form journey; exercise the same journeys with an HTTP client |Repeatable owner journeys pass; accessible labels, focus, and status text do not depend on color alone; No hidden UI-only workflow or data hydration bypass |
+| 33 |Resolve shared validation/error/empty/loading inconsistencies; timezone display; safe logs; no lazy protected reads after transaction end; dependency/asset review; Unify API error and frontend mapping for field errors, forbidden/not-found, conflict, throttling, and session expiry; avoid blind mutation retries |Errors preserve safe input without exposing secrets or another tenant; frontend and PHP checks pass; Contract/client behavior is consistent without exposing secrets |
 | 34 | Finalize staging/production base domain, host/region/budget, SMTP provider, DNS/TLS ownership, mail sender, session storage, retention/recovery targets with owner; prepare exact config/runbook | Required choices recorded; no migration credential in web config; staging has an approved deployment plan |
 | 35 | Deploy isolated staging with web server/PHP-FPM, PostgreSQL runtime grants, wildcard tenant DNS/TLS, trusted-host rules, and real recovery/setup mail | Two synthetic tenants work over HTTPS; reset/setup links stay on correct hosts; developer server/SSH tunnel not used as public hosting |
 
@@ -172,7 +178,7 @@ than treating localhost checks as staging verification.
 | 36 | Configure encrypted scheduled database backups and retention; restore into an isolated database; measure recovery time and validate app data | Backup retrieval and restore are demonstrated; recovery targets are owner-approved and measured, not assumed |
 | 37 | Service startup/restart, filesystem ownership, runtime permissions, HTTPS cookies/debug settings, log rotation/redaction, health checks and error/backup/database monitoring | Restart/reboot and failure alerts behave as documented; no secrets or tenant data in health responses |
 | 38 | Rehearse release build and privileged migration step, runtime switch, smoke checks, compatible code rollback/forward database repair; verify upgrade from prior schema | Reproducible deployment succeeds without runtime DDL privileges or destructive database rollback |
-| 39 | Owner UAT with administrator/manager/technician checklist; provisioning/deactivation/reassignment/reset/restore runbooks and support/offboarding notes | Owner records concrete acceptance or defects; documentation covers everyday and failure operations |
+| 39 |Owner UAT with administrator/manager/technician checklist; provisioning/deactivation/reassignment/reset/restore runbooks and support/offboarding notes; Include API-only workflow evidence and UI-to-API coverage in UAT |Owner records concrete acceptance or defects; documentation covers everyday and failure operations; Owner can review contract, HTTP test results, and browser evidence |
 | 40 | **Contingency 4:** fix UAT/operational defects; otherwise advance Day 41 | No known release-blocking defect is carried forward as an undocumented assumption |
 
 **Gate:** restore, failure recovery, operational ownership, and core user behavior
@@ -183,7 +189,7 @@ are understood and demonstrated before release signoff.
 | Day | Work within the four-hour block | Exit condition / proof |
 | --- | --- | --- |
 | 41 | Final security/capability and data-lifecycle review; dependency findings, recovery mail, wildcard-host/session configuration, secret exposure, and offboarding obligations | Release-blocking issues fixed or gate stays closed; no real customer data accepted before retention/offboarding decisions |
-| 42 | Verify fresh checkout and upgrade instructions; tagged/reviewed release candidate; CI includes mandatory database and browser checks | A clean environment can reproduce the release; no untracked server file or manual SQL step is required |
+| 42 |Verify fresh checkout and upgrade instructions; tagged/reviewed release candidate; CI includes mandatory database and browser checks; Validate complete OpenAPI coverage and required API contract/HTTP tests in CI |A clean environment can reproduce the release; no untracked server file or manual SQL step is required; Release is reproducible with API verification included |
 | 43 | Run the release candidate on staging; end-to-end acceptance, backup/restore evidence, monitoring and deployment rehearsal against the final artifact | Final reviewable artifact and complete evidence pack; outstanding limitations recorded |
 | 44 | Obtain owner release approval; then deploy the reviewed artifact and run production smoke/tenant checks with rollback readiness | Production publication happens only after explicit approval; if approval/access is pending, remain on staging |
 | 45 | **Contingency 5:** post-release observation and fixes, or resolve release blockers; avoid adding new features | Stable verified release, or a clearly reported remaining gate with a revised date |
@@ -197,12 +203,12 @@ never substitutes for passing a gate or receiving release authorization.
 | --- | --- | --- |
 | Confirm the next session as Day 1 and whether workdays exclude holidays | Before putting calendar dates on this forecast | Capacity is known; actual availability is not |
 | Base-domain configuration convention for local tests | Day 2 | Subdomain parsing and URL generation must use a trusted base |
-| Real-world display preferences not already agreed | Before affected UI is polished | Use simple existing Blade/Tailwind patterns until feedback arrives; do not block authentication |
+| Real-world display preferences not already agreed | Before affected UI is polished | Use the API-backed shell/client and Tailwind patterns; do not block authentication APIs |
 | Staging/production domain, budget, provider access, SMTP sender | Start gathering by Day 11; finalize by Day 34 | DNS, certificates, and sender verification can create external waits |
 | Backup retention, recovery objectives, offboarding/permanent-erasure policy | Before Days 36–41 | Existing plan targets are recommendations, not guarantees or legal conclusions |
 | Owner UAT availability and explicit release approval | Days 39 and 44 | Required acceptance cannot be inferred from elapsed time |
 
-Critical path: tenant lookup/context → login/session isolation → account recovery
+Critical path: API contract/client foundation → tenant lookup/context → login/session APIs and isolation → account recovery
 and policies → valid clients/contacts → tickets/workflow/history → dashboard →
 staging/operations → approved release. CI and service/domain setup are started early
 to expose blockers; features remain sequential where they share unverified foundations.
@@ -212,10 +218,10 @@ to expose blockers; features remain sequential where they share unverified found
 | Original milestone | Already complete | Remaining scheduled work |
 | --- | --- | --- |
 | M0 schema baseline | Baseline, forward name/workflow migration, SQL checks | Targeted new forward migrations for remaining approved requirements; no baseline reset |
-| M1 runnable foundation | Native server, scaffold/lockfiles, migration adoption, asset build, smoke tests | Days 1, 11–12, 42: repeatable docs, mandatory CI, shared UI/Livewire; Compose is optional |
-| M2 tenant/auth/security | Provisioning and its PostgreSQL tests | Days 2–9, 31: tenant lookup/context, login/logout, recovery/setup, capabilities and isolation |
+| M1 runnable foundation | Native server, scaffold/lockfiles, migration adoption, asset build, smoke tests | Days 1, 11–12, 42: repeatable docs, mandatory CI, shared API client UI and contract checks; Compose is optional |
+| M2 tenant/auth/security | Provisioning and its PostgreSQL tests | Days 2–9, 31: API/client contracts, tenant lookup/context, login/logout/session/recovery/setup APIs, capabilities and isolation |
 | M3 employees/clients | Domain tables only | Days 8–9, 13–16: employee/admin settings and complete client/contact lifecycle |
-| M4 first ticket slice | Database relationships/numbering/audit | Days 17–19, 24: UI/actions, stale-write checks, readable history |
+| M4 first ticket slice | Database relationships/numbering/audit | Days 17–19, 24: APIs, API-backed UI/actions, stale-write checks, readable history |
 | M5 work lifecycle | Database statuses/timestamps/reason audit | Days 21–26: claim/assignment, comments/revisions, status forms, restore and races |
 | M6 dashboard/usability | Supporting indexes only | Days 27–33: views, search/filters, pagination, performance and browser/accessibility checks |
 | M7 release preparation | Development access only | Days 34–45: staging, mail/DNS/TLS, backups, monitoring, runbooks, acceptance/release |
