@@ -8,16 +8,15 @@ Docker is not required. GitHub Actions supplies an isolated PostgreSQL service.
 
 Git, PHP 8.5 with PDO PostgreSQL/SQLite, DOM/XML/XMLWriter, fileinfo, mbstring and
 the extensions checked by Composer; Composer 2; Node 22/npm; PostgreSQL 18 client
-and server. The owner verified PHP 8.5.12/Laravel 13.39.0/PostgreSQL 18.6. Use the
+and server. Development is verified with PHP 8.5.12/Laravel 13.39.0/PostgreSQL 18.6. Use the
 lockfiles, not unreviewed dependency updates. `composer check-platform-reqs`
 identifies missing PHP requirements; `pdo_pgsql` is additionally required even
 though the framework can install without it.
 
-## Existing owner server: preserve it
+## Updating an existing environment
 
-The existing checkout is `/home/ajanci/projects/caselantern`. Its database,
-application key, migrations, runtime account, and Janci Tech tenant already exist.
-**Do not run the fresh-role/database commands below on that setup.**
+Preserve its database, application key, applied migrations, runtime account, and
+tenant data. **Do not run the fresh-role/database commands below on an existing setup.**
 
 Before changing branch, run `git status --short`. Preserve untracked server files;
 do not use `git clean`, reset, or overwrite them. Fetch and switch to the reviewed
@@ -90,8 +89,8 @@ Ident rule, add narrowly scoped SCRAM rules for these development databases/role
 host caselantern,caselantern_provisioning_test caselantern_migrator,caselantern_app 127.0.0.1/32 scram-sha-256
 ```
 
-Back up the file before editing. On the owner's Fedora server it is
-`/var/lib/pgsql/data/pg_hba.conf`; do not assume that path on another installation.
+Back up the file before editing. A Fedora installation may use
+`/var/lib/pgsql/data/pg_hba.conf`; use the reported path rather than assuming it.
 Check `pg_hba_file_rules` for errors before `SELECT pg_reload_conf();`. Never
 replace general authentication with `trust`. The first matching rule wins.
 The IPv4 rule matches the configured `DB_HOST=127.0.0.1`; add an equally narrow
@@ -173,9 +172,9 @@ php artisan migrate --database=pgsql_migrator
 unset CASELANTERN_MIGRATION_PASSWORD
 ```
 
-The owner already has a separate migrated test database created from the empty
-schema-check database. Do not recreate it or blindly adopt/reapply the baseline.
-Both paths need runtime grants and SCRAM access for **both** roles on the test DB:
+If a migrated test database already exists, do not recreate it or blindly
+adopt/reapply the baseline. Both paths need runtime grants and SCRAM access for
+**both** roles on the test DB:
 
 ```bash
 sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d caselantern_provisioning_test \

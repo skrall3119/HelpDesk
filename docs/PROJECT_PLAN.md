@@ -1,6 +1,6 @@
 # CaseLantern — Project Plan
 
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
 This is the authoritative product and implementation plan. The older lowercase `project_plan.md` is historical. The PostgreSQL migration describes currently implemented database behavior; confirmed product decisions in this plan define the target behavior. Where they differ, the schema must be reconciled before affected application work. This plan also describes application behavior that has not been built yet.
 
@@ -22,7 +22,7 @@ Success means a new organization can be provisioned, its administrator can add e
 | PostgreSQL domain schema | Implemented and applied | Seven domain tables; name/workflow forward migration applied in batch 2; remaining client/contact and comment-revision requirements need targeted forward work |
 | Database checks | Passed per owner on PostgreSQL 18.6 | Upgrade/schema checks cover constraints, audit behavior, and non-owner RLS; earlier PostgreSQL 17 baseline pass remains historical evidence |
 | Laravel application and frontend | Scaffold implemented | Laravel skeleton committed; assets and two smoke tests passed on the server; business screens remain unbuilt |
-| Tenant provisioning CLI | Implemented and verified | 17 tests / 59 assertions passed including three PostgreSQL tests; Pint passed; Janci Tech (`jancitech`, tenant 1 / administrator 1) created successfully |
+| Tenant provisioning CLI | Implemented and verified | 17 tests / 59 assertions passed including three PostgreSQL tests; Pint passed; initial tenant/admin creation verified |
 | Authentication and capability policies | Not started | Database role values are not application authorization |
 | Development access | Verified | Asset build, smoke tests, restricted runtime connection, and SSH-forwarded welcome page work |
 | Deployment, CI, backups, and release operations | Not started | Development server is not production hosting; remaining work is scheduled below |
@@ -39,6 +39,8 @@ The schema does not by itself implement a usable or production-ready SaaS applic
 
 ### V1 core
 
+- **Confirmed: fully API-centric application.** Authentication, session/current-user loading, recovery/setup, every data read, and every form submission/mutation use documented HTTP APIs. The frontend is an API client; every application workflow is independently usable and testable without the UI.
+
 - Tenant-aware employee login/logout and account recovery.
 - Administrator employee management with fixed Administrator, Manager, and Technician roles.
 - Clients of type individual or business, one address per client, and multiple contacts.
@@ -52,7 +54,7 @@ The schema does not by itself implement a usable or production-ready SaaS applic
 
 ### Working default: later releases
 
-**Confirmed:** categories are deferred beyond V1. No category management, ticket category field, category filters, or category schema is required in V1. Reports are excluded from V1, as previously agreed. Attachments, public registration, billing/subscriptions, client portals, email-to-ticket, outbound ticket notifications, SLAs, teams, custom roles, multiple addresses, AI features, integrations, and public APIs are outside V1.
+**Confirmed:** categories are deferred beyond V1. No category management, ticket category field, category filters, or category schema is required in V1. Reports are excluded from V1, as previously agreed. Attachments, public registration, billing/subscriptions, client portals, email-to-ticket, outbound ticket notifications, SLAs, teams, custom roles, multiple addresses, AI features, integrations, and third-party API access/programs are outside V1. The application's own complete API is required in V1; this exclusion does not defer any frontend API.
 
 Account-recovery email is infrastructure for authentication and is separate from deferred ticket email integration. If outbound email is unavailable in a development environment, use a local mail sink; production recovery must work before release.
 
@@ -216,15 +218,18 @@ Tenant-first indexes cover filters, assignments, relationships, and timelines. T
 
 ## 10. Application architecture
 
-**Working implementation direction:** one Laravel application with a server-rendered Blade frontend, Livewire for interactive forms/filters, and Tailwind CSS for styling. PostgreSQL 18.6 is the verified development server version; use PostgreSQL 18 for required integration/CI checks. The historical SQL baseline also passed earlier PostgreSQL 17 checks. Use Laravel policies, Form Requests or equivalent server validation, Eloquent models, and small domain action classes. Avoid a separate SPA/API and microservices for V1.
+**Confirmed architecture (owner, 2026-11-03):** one Laravel application exposes a complete HTTP/JSON API consumed by the frontend. All authentication, data loading (including initial screen data, current user/capabilities, lookups, dependent pickers, lists, details, history, search, filters, and pagination), and form submissions/mutations cross this API boundary. Do not implement parallel browser controllers or Livewire actions that directly read domain data or invoke domain mutations outside the API.
 
-The server has Laravel 13.39.0, PHP 8.5.12, Composer 2.10.3, Node 22.23.1, npm 10.9.8, and committed Composer/npm lockfiles. Platform checks and asset build passed. Livewire is not yet installed in the reviewed manifest; integrate a compatible version when interactive UI work begins and document reproducible setup in the root README. Use PHPUnit through Laravel's testing facilities; select one test style and apply it consistently.
+Keep PostgreSQL, Laravel policies, server validation, Eloquent models, small domain action classes, and Tailwind. Blade may serve a static application shell and assets, but must not hydrate tenant/business data into pages. Pure presentation state stays local. A separate deployment or microservices are not required. Select and document the frontend client approach during the API foundation work; no new frontend framework is implied by this decision. Use one shared API client for credentials, CSRF handling, JSON parsing, errors, and loading states.
+
+The server has Laravel 13.39.0, PHP 8.5.12, Composer 2.10.3, Node 22.23.1, npm 10.9.8, and committed Composer/npm lockfiles. Platform checks and asset build passed. Livewire is not installed in the reviewed manifest and is no longer a planned dependency. Use PostgreSQL 18 for required integration/CI checks (18.6 is verified on the development server) and PHPUnit through Laravel's testing facilities.
 
 Suggested responsibilities:
 
 - Middleware resolves tenant context, authenticates, checks active status, and establishes transaction-local database context.
 - Policies/gates answer capability questions; they do not perform writes.
-- Controllers/Livewire components handle requests, validation results, and presentation.
+- API controllers validate requests, invoke authorized domain actions, and return explicit JSON resources; they never serialize secrets or unrestricted models.
+- Frontend components load all application data and submit all changes through the shared API client; UI capability hints never replace server authorization.
 - Actions such as `CreateTicket`, `ClaimTicket`, `AssignTicket`, `ChangeTicketStatus`, `DeleteTicket`, `RestoreTicket`, and `SetPrimaryContact` own transactions and invariants.
 - Models define tenant-scoped relationships, casts, and soft-delete scopes. Explicitly allowlist writable fields.
 - Database constraints/triggers provide the final relationship/completion checks and ticket history.
@@ -247,7 +252,7 @@ The current RLS design cannot resolve an unknown tenant ID from its slug through
 
 Working implementation defaults: validate hosts against the configured base domain, keep session cookies host-only (`SESSION_DOMAIN` unset/null), and generate login/recovery URLs for the resolved tenant host. Local testing can use `acme.localhost:8000` through the existing SSH tunnel; verify hostname resolution on the user's browser. The production base domain and wildcard DNS/TLS remain deployment decisions. Subdomain selection never substitutes for tenant authorization or PostgreSQL context.
 
-Provisioning implementation: [`TENANT_PROVISIONING.md`](TENANT_PROVISIONING.md) documents `php artisan caselantern:provision-tenant`, its command-scoped migration credentials, password prompts, and disposable PostgreSQL checks. It reserves a tenant identity before establishing transaction-local context, so tenant/admin inserts satisfy forced RLS. No browser login or public provisioning endpoint is implemented by this slice. The owner ran the command/real PostgreSQL tests successfully on the server (17 tests, 59 assertions), confirmed formatting, and provisioned Janci Tech; no password is recorded here.
+Provisioning implementation: [`TENANT_PROVISIONING.md`](TENANT_PROVISIONING.md) documents `php artisan caselantern:provision-tenant`, its command-scoped migration credentials, password prompts, and disposable PostgreSQL checks. It reserves a tenant identity before establishing transaction-local context, so tenant/admin inserts satisfy forced RLS. No browser login or public provisioning endpoint is implemented by this slice. The owner ran the command/real PostgreSQL tests successfully on the server (17 tests, 59 assertions), confirmed formatting, and provisioned an initial organization; no password is recorded here.
 
 ### Request sequence
 
@@ -257,11 +262,11 @@ Provisioning implementation: [`TENANT_PROVISIONING.md`](TENANT_PROVISIONING.md) 
 4. Set `app.user_id` from the authenticated user before any ticket write; perform policy checks before actions.
 5. Commit only successful operations; roll back failures. Never stream/lazily load protected rows after the context transaction ends.
 
-Ensure route-model binding and Livewire requests run after context establishment. Reestablish context for every request and every job; never rely on connection state from a prior request. Keep outbound email/network calls outside transactions and dispatch only after commit.
+Ensure API route-model binding and all authenticated API requests run after context establishment. Reestablish context for every request and every job; never rely on connection state from a prior request. Keep outbound email/network calls outside transactions and dispatch only after commit.
 
 ### Authentication lifecycle
 
-Use framework password hashing, session regeneration on login, CSRF protection, login/recovery rate limiting, secure cookies under HTTPS, generic invalid-credential responses, and session invalidation on logout. Disable authentication for deactivated tenants/users on every request, not just at login. Use server-rendered escaped output and parameterized database queries.
+Use framework password hashing, session regeneration on login, CSRF protection, login/recovery rate limiting, secure cookies under HTTPS, generic invalid-credential responses, and session invalidation on logout. Disable authentication for deactivated tenants/users on every request, not just at login. Render API-provided text safely in the frontend and use parameterized database queries. Expose login, logout, current-session/user/capabilities, recovery, reset, and initial password setup through the API. Session expiry and deactivation return JSON authentication failures, not HTML redirects.
 
 Password recovery must be tenant-scoped. Default reset-token storage keyed only by email is insufficient when emails repeat across tenants; include tenant identity in token lookup/storage and reset links, expire/single-use tokens, and test cross-tenant token rejection. Provision new users with a one-time password-setup flow using that mechanism. In development, inspect setup mail in the mail sink rather than exposing links to ordinary users.
 
@@ -294,21 +299,28 @@ Dashboard filters combine with AND; tabs add their assignment condition. Default
 
 Provide loading, empty, validation, forbidden/not-found, and conflict states; keyboard-accessible labels/focus, status text beyond color, and usable layouts on desktop/mobile. Show cross-tenant record lookups as not found without revealing ownership.
 
-## 13. HTTP/application interface
+## 13. HTTP/API interface
 
-V1 serves authenticated browser routes, not a public API. Route families on each `{tenant_slug}.{base_domain}` host:
+**Confirmed:** the frontend uses the same documented API for every application operation. Working convention: tenant-scoped, same-origin `/api/v1` endpoints on each `{tenant_slug}.{base_domain}` host. Browser page routes serve only the application shell/assets. No business data, authentication submission, or mutation may bypass the API through a Blade form handler, Livewire action, or direct browser database access.
 
-| Route/action family | Responsibility |
+| API family (working paths under /api/v1) | Responsibility |
 | --- | --- |
-| Login/logout/recovery | Guest/session lifecycle with tenant context |
-| `/tickets`, `/tickets/create`, `/tickets/{ticket}` | List, create, read, authorized edit |
-| Ticket claim/assignment/status/comment actions | Dedicated authorized mutations |
-| Ticket delete/restore and deleted-ticket list | Restricted soft-delete lifecycle |
-| `/clients`, `/clients/{client}` and nested contacts | Client/contact management |
-| `/admin/users` | Administrator employee management |
-| `/admin/settings` | Organization settings |
+| `/auth/csrf`, `/auth/login`, `/auth/logout`, `/auth/session` | CSRF bootstrap, login/logout, current user and capabilities/session state |
+| `/auth/forgot-password`, `/auth/reset-password`, `/auth/setup-password` | Tenant-scoped recovery and one-time setup |
+| `/tickets`, `/tickets/{ticket}` | Paginated list/search/filter, create, detail, edit, soft delete |
+| Ticket claim/assignment/status actions | Dedicated authorized mutations; generic edits cannot bypass them |
+| Ticket comments, revisions, activity, restore, and deleted-ticket collection | Internal history, comment lifecycle, restricted restoration |
+| `/clients`, `/clients/{client}`, nested contacts and primary/lifecycle actions | Full client/contact reads, lookup options, atomic creation and lifecycle |
+| `/admin/users`, employee lifecycle/setup actions | Administrator employee reads and management |
+| `/admin/settings` | Organization settings read/update |
 
-Use GET only for reads, POST for creation/actions, PATCH for updates, and DELETE for soft deletion when using conventional controllers. All browser mutations require CSRF protection. Livewire actions must apply the same policies and validation as controller actions; neither route style may bypass domain actions.
+Finalize exact paths and schemas before implementing each slice and maintain a version-controlled OpenAPI contract with request/response examples. Document every UI operation, query parameter, authentication requirement, capability, validation error, pagination shape, and conflict response. Route names above are working conventions, not existing endpoints.
+
+Use GET only for reads, POST for creation/actions, PATCH for updates, and DELETE for soft deletion. Successful data responses use an explicit `data` shape and paginated collections include bounded pagination metadata. Use consistent JSON errors with a stable code, safe message, and field errors where applicable: 401 unauthenticated, 403 forbidden, 404 missing/cross-tenant resource, 409 concurrency conflict, 422 invalid input, and 429 rate limited. Define and test the CSRF failure response too; API failures must never fall through to HTML redirects/pages. Never expose password hashes, reset tokens, or internal exception details.
+
+Working authentication default: same-origin, host-only secure HttpOnly session cookies with framework CSRF protection on browser mutations (including login/logout), session regeneration/invalidation, and rate limiting. API-centric does not require JWTs or public third-party access. Document bootstrap and expired-session recovery in the API client; do not automatically replay non-idempotent submissions after authentication or network failures. Keep tenant identity derived from the validated host, and enforce policies, RLS context, validation, and active-user/tenant checks at every API boundary.
+
+Domain actions remain reusable internally for the existing controlled provisioning CLI and background jobs; those are not alternative frontend access paths. Public registration, third-party credentials/integration programs, and public provisioning remain outside V1.
 
 ## 14. Test and validation plan
 
@@ -316,8 +328,9 @@ Use real PostgreSQL 18 for required database/feature/integration tests; SQLite c
 
 | Area | Required evidence |
 | --- | --- |
-| Tenant isolation | A/B fixtures; direct URLs, lists, search, relationships, Livewire requests, missing context, reused connection, and background jobs cannot leak data |
-| Authentication | Tenant-scoped duplicate emails, invalid credentials, deactivation, logout, CSRF, session tenant mismatch, recovery token isolation |
+| Tenant isolation | A/B fixtures; direct URLs, lists, search, relationships, API requests, missing context, reused connection, and background jobs cannot leak data |
+| API contract and frontend boundary | OpenAPI/request-response checks; JSON errors/statuses; every UI read and submission uses the API; complete workflows pass via HTTP without rendering the UI; no alternate business/auth web handlers |
+| Authentication | CSRF bootstrap, current session/capabilities, JSON expiry failures, tenant-scoped duplicate emails, invalid credentials, deactivation, logout, CSRF, session tenant mismatch, recovery token isolation |
 | Roles | Every capability allowed/denied per matrix, including forged assignment/role/tenant fields and deleted-ticket access |
 | Clients/contacts | Required fields, dependent picker, cross-client contact rejection, primary-contact race/restore conflict, current contact information on old tickets |
 | Assignment | Self-claim only; no technician reassignment; manager reassignment; inactive target rejection; two concurrent claims yield one winner |
@@ -329,29 +342,29 @@ Use real PostgreSQL 18 for required database/feature/integration tests; SQLite c
 
 Existing SQL checks remain an independent guard. Integration tests for races must use separate connections/processes and committed fixtures; a single test transaction is insufficient. Run browser smoke checks for the main creation/work/admin journeys and basic accessibility.
 
-Definition of done for each implementation slice: authorized behavior works, denial paths are tested, tenant context is correct, no unrelated scope is added, relevant checks pass, and setup/documentation reflect the result.
+Definition of done for each implementation slice: documented API contracts and direct HTTP tests pass, frontend network checks prove all reads/submissions use those APIs, authorized behavior works, denial paths are tested, tenant context is correct, no unrelated scope is added, relevant checks pass, and setup/documentation reflect the result.
 
 ## 15. Development workflow and CI
 
 Verified development setup: the existing native remote Fedora server with Laravel/PHP, PostgreSQL 18.6, built frontend assets, and Windows SSH forwarding. Keep this workflow; Docker Compose is optional portability work and is not a V1 prerequisite. Add development mail capture for recovery/setup testing. Bind local services appropriately; no committed credentials. A root README will document installation, migrations, provisioning, assets, test commands, and troubleshooting once scaffolded. Provide `.env.example` with safe placeholders and committed Composer/npm lockfiles.
 
-CI should run on proposed changes: install locked dependencies, check formatting/static analysis, build frontend assets, create a fresh PostgreSQL database, migrate/provision fixtures, run SQL and application tests, and exercise non-owner runtime credentials. Do not substitute a superuser connection for RLS assertions. Add browser checks after the first vertical slice exists. Test migration from the last release before production database changes.
+CI should run on proposed changes: install locked dependencies, check formatting/static analysis, build frontend assets, create a fresh PostgreSQL database, migrate/provision fixtures, run SQL, API contract, and application tests, and exercise non-owner runtime credentials. Do not substitute a superuser connection for RLS assertions. Add browser checks after the first vertical slice exists. Test migration from the last release before production database changes.
 
 Use small commits tied to milestones. Keep migration changes versioned; once applied to shared environments, add follow-up migrations instead of editing history. No production data in fixtures or logs.
 
 ## 16. Delivery roadmap and acceptance gates
 
-The development workflow and provisioning slice are established. The owner selected four focused hours per workday. [SPRINT_SCHEDULE.md](SPRINT_SCHEDULE.md) now provides a 45-workday forecast (180 hours including 20 hours of explicit contingency) through V1 release. Days are relative, not committed dates; reforecast after each sprint. Existing milestones below remain acceptance gates, not claims that all work in each milestone is already finished.
+The development workflow and provisioning slice are established. The owner selected four focused hours per workday. [SPRINT_SCHEDULE.md](SPRINT_SCHEDULE.md) now provides a 45-workday forecast (180 hours including 20 hours of explicit contingency) through V1 release. Days are relative, not committed dates; the API-centric revision requires re-estimation after the first authentication/API slice rather than assuming the prior 180-hour forecast is validated. Reforecast after each sprint. Existing milestones below remain acceptance gates, not claims that all work in each milestone is already finished.
 
 | Milestone | Deliverables | Exit condition |
 | --- | --- | --- |
 | M0: planning/schema baseline | Current plan, seven-table schema, documented assumptions | Existing SQL checks pass; product questions tracked |
-| M1: runnable foundation | Laravel/Blade/Livewire scaffold, pinned dependencies, documented native development setup, migration adoption, README, CI skeleton | Fresh checkout boots; schema applies once; SQL tests pass on PostgreSQL |
-| M2: tenant/auth/security foundation | Tenant lookup/provision CLI, runtime grants, context middleware, login/logout/recovery, policies, two-tenant fixtures | Non-owner isolation tests pass; inactive accounts/tenants blocked; reset flow tenant-safe |
-| M3: employees and clients | Administrator user management, last-admin protection, client/contact forms, primary contact | Tenant A administrator creates employee/client/contact; tenant B cannot see them |
-| M4: first ticket slice | Ticket create/list/detail/edit, contact dependency, numbering, displayed audit history | Authenticated user creates a ticket and sees its number/current contact/history |
-| M5: work lifecycle | Atomic self-claim, manager assignment, status/priority, comments, conflicts, soft-delete/restore | Concurrent claims yield one winner; complete/reopen/delete/restore flows pass role tests |
-| M6: dashboard and usability | All/My/Unassigned, filters, number/full-text search, pagination, responsive states | Main browser journeys pass with realistic synthetic data and bounded queries |
+| M1: runnable foundation | Laravel API and frontend shell scaffold, pinned dependencies, documented native development setup, migration adoption, README, CI skeleton | Fresh checkout boots; schema applies once; SQL tests pass on PostgreSQL |
+| M2: tenant/auth/security foundation | Tenant lookup/provision CLI, runtime grants, context middleware, API contract/client foundation, login/logout/session/recovery APIs, policies, two-tenant fixtures | Non-owner isolation tests pass; inactive accounts/tenants blocked; reset flow tenant-safe |
+| M3: employees and clients | Administrator user management, last-admin protection, client/contact APIs and API-backed forms, primary contact | Tenant A administrator creates employee/client/contact; tenant B cannot see them |
+| M4: first ticket slice | Ticket create/list/detail/edit APIs and frontend, API contact dependency, numbering, displayed audit history | Authenticated user creates a ticket and sees its number/current contact/history |
+| M5: work lifecycle | APIs and frontend for atomic self-claim, manager assignment, status/priority, comments, conflicts, soft-delete/restore | Concurrent claims yield one winner; complete/reopen/delete/restore flows pass role tests |
+| M6: dashboard and usability | API-backed All/My/Unassigned, filters, number/full-text search, pagination, responsive states | Main browser journeys pass with realistic synthetic data and bounded queries |
 | M7: release preparation | Staging deploy, mail/session config, monitoring, backup/restore, runbook | Release gates below pass; owner accepts staging workflow |
 
 ### Original M1 checklist (historical; use the daily schedule for remaining work)
@@ -364,7 +377,7 @@ The development workflow and provisioning slice are established. The owner selec
 6. Add the root README, example environment, reproducible commands, and initial CI job.
 7. Open the initial browser page and verify the project can be started again from the documented steps.
 
-The scaffold, migration adoption, SQL checks, asset build, and local browser access in this historical checklist are complete. CI, reproducible root documentation, Livewire, and remaining acceptance work are scheduled; do not repeat completed setup or provision the existing tenant again.
+The scaffold, migration adoption, SQL checks, asset build, and local browser access in this historical checklist are complete. CI, reproducible root documentation, API/client foundation, and remaining acceptance work are scheduled; do not repeat completed setup or provision the existing tenant again.
 
 ## 17. Deployment and operations
 
@@ -382,6 +395,7 @@ Document provisioning/deactivation, recovery, failed migration, backup restorati
 
 V1 is ready when:
 
+- All application workflows, including authentication/recovery, work through documented APIs without the UI; browser network checks confirm every data load and submission uses them.
 - A fresh checkout starts using documented commands with no hidden manual database edits.
 - A controlled operator provisions an organization and administrator without shared/default credentials.
 - Administrator creates an employee; a client/contact and ticket are created; technician claims, comments, closes; manager reassigns and deletes/restores.
@@ -405,7 +419,7 @@ Answers override the corresponding working defaults throughout this plan. Catego
 
 ### Defaults available for review; do not block scaffolding
 
-Soft deletion with manager/admin restoration; required primary contact at client creation; contact email or phone required; general client contact details optional; names required; tenant-scoped case-insensitive user email; integer numbering displayed as `CL-000001`; current contact information; preserved inactive historical relationships; ticket snapshot history; eligible assignees include all ticket-working roles; server-rendered Laravel/Livewire frontend; no public API/registration.
+Soft deletion with manager/admin restoration; required primary contact at client creation; contact email or phone required; general client contact details optional; names required; tenant-scoped case-insensitive user email; integer numbering displayed as `CL-000001`; current contact information; preserved inactive historical relationships; ticket snapshot history; eligible assignees include all ticket-working roles; same-origin session-cookie API authentication and frontend client tooling; no public registration or third-party API program. The fully API-centric architecture is confirmed, not a working default.
 
 ### Needed before production
 
@@ -430,12 +444,13 @@ Hosting/provider/budget/region/domain; outbound recovery mail; backup/recovery t
 | Owner decision, 2026-11-02 | Categories deferred beyond V1 |
 | Owner decision, 2026-11-02 | Tenant subdomains select independent tenant accounts; replace the proposed `/t/{tenant_slug}` routing |
 | Schema work | PostgreSQL baseline/forward workflow migration applied and checks passed; Laravel scaffold exists, business application remains to be built |
-| Verified on server, 2026-11-02 | Provisioning tests passed (17 tests, 59 assertions); Janci Tech created with slug `jancitech`; browser authentication still unbuilt |
+| Verified on server, 2026-11-02 | Provisioning tests passed (17 tests, 59 assertions); initial tenant/admin creation verified; browser authentication still unbuilt |
 | Owner capacity, 2026-11-02 | Daily sprint schedule assumes four focused hours per workday; relative-day forecast includes explicit contingency |
+| Owner decision, 2026-11-03 | Fully API-centric application: authentication/session/recovery, all data loading, and all forms/mutations use documented APIs; frontend is an API client. Supersedes server-rendered/Livewire business-handler defaults; Laravel/PostgreSQL and controlled CLI provisioning remain. |
 | Git upload request | Baseline plan/schema/setup notes/tests uploaded to repository `main` in commit `7f46fd0` |
 
 Additional product confirmations will be added here after the owner answers. Code existence and prior upload do not imply confirmation of every provisional product default.
 
 ## 21. Daily execution schedule
 
-Use [SPRINT_SCHEDULE.md](SPRINT_SCHEDULE.md) for the completed-work inventory, all 45 daily tasks and exit conditions, contingency allocation, decision deadlines, and coverage of M0–M7. The next execution slice is tenant lookup/context and subdomain-aware login. No scheduled day is automatically authorized to publish production without owner release approval.
+Use [SPRINT_SCHEDULE.md](SPRINT_SCHEDULE.md) for the completed-work inventory, all 45 daily tasks and exit conditions, contingency allocation, decision deadlines, and coverage of M0–M7. The next execution slice is API contract/client foundation, tenant lookup/context, and subdomain-aware authentication APIs. No scheduled day is automatically authorized to publish production without owner release approval.
