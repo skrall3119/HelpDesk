@@ -108,7 +108,7 @@ jobs:
 
       - name: Application checks including mandatory real PostgreSQL tests
         run: |
-          vendor/bin/pint --test app tests
+          vendor/bin/pint --test -v app tests
           vendor/bin/phpunit --fail-on-skipped
 
       - name: Build frontend assets

@@ -145,7 +145,7 @@ class AuthenticationPostgresTest extends TestCase
             $this->postJson($this->url('login'), ['email' => $email, 'password' => 'wrong'])
                 ->assertUnauthorized()->assertExactJson(['message' => 'Invalid credentials.']);
         }
-        for ($attempt = 0; $attempt < 4; ++$attempt) {
+        for ($attempt = 0; $attempt < 4; $attempt++) {
             $this->postJson($this->url('login'), ['email' => 'shared@example.test', 'password' => 'wrong'])->assertUnauthorized();
         }
         $this->postJson($this->url('login'), ['email' => 'shared@example.test', 'password' => 'wrong'])
