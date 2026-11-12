@@ -18,6 +18,8 @@ are maintained in the [sprint schedule](docs/SPRINT_SCHEDULE.md#progress).
 ## Start here
 
 - [Development setup: fresh checkout and existing server](docs/DEVELOPMENT.md)
+- [Bearer authentication and server verification](docs/AUTHENTICATION.md)
+- [Automated development deployment](docs/DEPLOYMENT.md)
 - [Tenant/admin provisioning](docs/TENANT_PROVISIONING.md)
 - [Product rules and implementation plan](docs/PROJECT_PLAN.md)
 - [Daily sprint schedule](docs/SPRINT_SCHEDULE.md)

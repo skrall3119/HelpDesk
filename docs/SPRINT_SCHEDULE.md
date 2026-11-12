@@ -1,5 +1,7 @@
 # CaseLantern — daily sprint schedule
 
+Owner update (2026-11-11): use bearer tokens with fixed 48-hour expiry and fresh login afterward. This supersedes the session-cookie/CSRF defaults below for header-authenticated APIs. See [AUTHENTICATION.md](AUTHENTICATION.md). Development deployments from main run after CI passes; see [DEPLOYMENT.md](DEPLOYMENT.md). Recovery/setup, capability policies and frontend integration remain separate milestones.
+
 Planning baseline: 2026-11-02; API-centric revision: 2026-11-03. Capacity confirmed by the owner: **4 focused hours per workday**.
 
 This is a forecast, not a delivery guarantee. Plan **45 workdays / 180 hours**:

@@ -1,6 +1,8 @@
 # CaseLantern — Project Plan
 
-Last updated: 2026-11-03
+Last updated: 2026-11-11
+
+**Owner update (2026-11-11):** authentication uses bearer tokens with an absolute 48-hour expiry and fresh login afterward. This supersedes cookie-session/CSRF defaults throughout this plan and the sprint schedule for the application's header-authenticated APIs. Preserve tenant subdomains and request-local PostgreSQL isolation. See [AUTHENTICATION.md](AUTHENTICATION.md) for the implemented contract and development setup. Login/logout/current-user are implemented in this change; server verification, recovery/setup, capabilities and frontend authentication remain outstanding. Development deployment is automatic from `main` only after CI passes; see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 This is the authoritative product and implementation plan. The older lowercase `project_plan.md` is historical. The PostgreSQL migration describes currently implemented database behavior; confirmed product decisions in this plan define the target behavior. Where they differ, the schema must be reconciled before affected application work. This plan also describes application behavior that has not been built yet.
 
@@ -266,7 +268,7 @@ Ensure API route-model binding and all authenticated API requests run after cont
 
 ### Authentication lifecycle
 
-Use framework password hashing, session regeneration on login, CSRF protection, login/recovery rate limiting, secure cookies under HTTPS, generic invalid-credential responses, and session invalidation on logout. Disable authentication for deactivated tenants/users on every request, not just at login. Render API-provided text safely in the frontend and use parameterized database queries. Expose login, logout, current-session/user/capabilities, recovery, reset, and initial password setup through the API. Session expiry and deactivation return JSON authentication failures, not HTML redirects.
+Use framework password hashing, cryptographically random bearer tokens stored only as hashes, an absolute 48-hour expiry, login/recovery rate limiting, HTTPS, generic invalid-credential responses, and current-token revocation on logout. Disable authentication for deactivated tenants/users on every request, not just at login; password changes invalidate prior tokens. Render API-provided text safely in the frontend and use parameterized database queries. Expose login, logout, current-user/capabilities, recovery, reset, and initial password setup through the API. Expiry and deactivation return JSON authentication failures, not HTML redirects. Header-only bearer endpoints do not accept cookie authentication and do not require CSRF bootstrap.
 
 Password recovery must be tenant-scoped. Default reset-token storage keyed only by email is insufficient when emails repeat across tenants; include tenant identity in token lookup/storage and reset links, expire/single-use tokens, and test cross-tenant token rejection. Provision new users with a one-time password-setup flow using that mechanism. In development, inspect setup mail in the mail sink rather than exposing links to ordinary users.
 

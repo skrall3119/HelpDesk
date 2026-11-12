@@ -89,6 +89,7 @@ jobs:
       - name: Bootstrap distinct PostgreSQL roles and databases
         run: |
           psql -X -v ON_ERROR_STOP=1 -f database/setup/development-roles.sql
+          psql -X -v ON_ERROR_STOP=1 -f database/setup/authentication-role.sql
           psql -X -v ON_ERROR_STOP=1 -c "ALTER ROLE caselantern_migrator PASSWORD 'ci-migration-only';"
           psql -X -v ON_ERROR_STOP=1 -c "ALTER ROLE caselantern_app PASSWORD 'ci-runtime-only';"
           createdb -O caselantern_migrator caselantern_provisioning_test
