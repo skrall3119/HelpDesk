@@ -37,11 +37,13 @@ jobs:
           DEV_PORT: ${{ vars.DEV_PORT || '22' }}
           DEV_PATH: ${{ vars.DEV_PATH }}
           DEV_RESTART_COMMAND: ${{ vars.DEV_RESTART_COMMAND }}
+          DEV_DATABASE: ${{ vars.DEV_DATABASE }}
+          DEV_HEALTH_URL: ${{ vars.DEV_HEALTH_URL }}
           DEV_SSH_KEY: ${{ secrets.DEV_SSH_KEY }}
           DEV_KNOWN_HOSTS: ${{ secrets.DEV_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          for name in DEV_HOST DEV_USER DEV_PATH DEV_RESTART_COMMAND DEV_SSH_KEY DEV_KNOWN_HOSTS; do
+          for name in DEV_HOST DEV_USER DEV_PATH DEV_RESTART_COMMAND DEV_DATABASE DEV_HEALTH_URL DEV_SSH_KEY DEV_KNOWN_HOSTS; do
             test -n "${!name}" || { echo "Configure $name in the development environment."; exit 1; }
           done
           [[ "$DEV_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
@@ -53,7 +55,7 @@ jobs:
           printf '%s\n' "$DEV_SSH_KEY" > "$HOME/.ssh/development_key"
           chmod 600 "$HOME/.ssh/development_key"
           printf '%s\n' "$DEV_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          printf -v remote_command 'bash -s -- %q %q %q' "$DEV_PATH" "$DEPLOY_SHA" "$DEV_RESTART_COMMAND"
+          printf -v remote_command 'bash -s -- %q %q %q %q %q' "$DEV_PATH" "$DEPLOY_SHA" "$DEV_RESTART_COMMAND" "$DEV_DATABASE" "$DEV_HEALTH_URL"
           ssh -i "$HOME/.ssh/development_key" -p "$DEV_PORT" \
             -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=15 "$DEV_USER@$DEV_HOST" "$remote_command" < scripts/deploy-development.sh
