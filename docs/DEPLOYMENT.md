@@ -6,6 +6,30 @@ Observed server: user `ajanci`, existing Git checkout `/home/ajanci/projects/cas
 
 ## 1. Prepare a new checkout
 
+The owner currently prefers keeping this change local. Use the supplied `helpdesk-auth-dev.bundle` for the first server checkout; the GitHub workflow cannot run until the change is later published and merged by the owner.
+
+From Windows PowerShell, substitute the SSH server address and use your usual `-i` key option if needed:
+
+```powershell
+scp C:\Users\alexj\Documents\ChatGPT\helpdeks\helpdesk-auth-dev.bundle ajanci@YOUR_SERVER:~/helpdesk-auth-dev.bundle
+```
+
+On the server, with `/var/www/caselantern/development` empty:
+
+```bash
+sudo install -d -o ajanci -g ajanci /var/www/caselantern/development
+git clone -b codex/bearer-auth-dev-deploy ~/helpdesk-auth-dev.bundle /var/www/caselantern/development
+cd /var/www/caselantern/development
+git remote set-url origin https://github.com/skrall3119/HelpDesk.git
+composer install --no-interaction --prefer-dist
+npm ci
+npm run build
+```
+
+Continue below with copying the working environment and the one-time setup. Do not switch this checkout to main until the authentication/deployment change has actually been merged there.
+
+### Alternative: checkout from GitHub after publication
+
 After this change is merged to main, run:
 
 ```bash
