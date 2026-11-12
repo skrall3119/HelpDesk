@@ -9,11 +9,13 @@ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = pg_catalog
 AS $$ SELECT t.id, t.active FROM public.tenants AS t WHERE t.slug = requested_slug $$;
 REVOKE ALL ON FUNCTION public.lookup_tenant(text) FROM PUBLIC;
+-- Grant execution while the migrator still owns the function. After the transfer,
+-- its NOINHERIT membership does not confer the new owner's grant privileges.
+GRANT EXECUTE ON FUNCTION public.lookup_tenant(text) TO caselantern_app;
 -- PostgreSQL requires temporary schema CREATE when transferring function ownership.
 GRANT CREATE ON SCHEMA public TO caselantern_tenant_lookup;
 ALTER FUNCTION public.lookup_tenant(text) OWNER TO caselantern_tenant_lookup;
 REVOKE CREATE ON SCHEMA public FROM caselantern_tenant_lookup;
-GRANT EXECUTE ON FUNCTION public.lookup_tenant(text) TO caselantern_app;
 
 CREATE TABLE public.access_tokens (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
