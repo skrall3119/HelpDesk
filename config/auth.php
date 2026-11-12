@@ -38,6 +38,7 @@ return [
     */
 
     'guards' => [
+        'api' => ['driver' => 'tenant-bearer'],
         'web' => [
             'driver' => 'session',
             'provider' => 'users',

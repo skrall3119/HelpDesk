@@ -1,0 +1,73 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "CaseLantern authentication API", "version": "1.0.0"},
+  "servers": [{"url": "https://{tenant}.{baseDomain}/api/v1", "variables": {
+    "tenant": {"default": "acme"}, "baseDomain": {"default": "example.com"}
+  }}],
+  "security": [{"bearerAuth": []}],
+  "paths": {
+    "/login": {"post": {
+      "operationId": "login", "security": [],
+      "description": "Tenant is resolved from the hostname. Issues an opaque token valid for exactly 48 hours, with no refresh or sliding expiration. Five attempts per tenant/email/minute and thirty per IP/minute.",
+      "requestBody": {"required": true, "content": {"application/json": {"schema": {
+        "type": "object", "required": ["email", "password"], "properties": {
+          "email": {"type": "string", "format": "email", "maxLength": 254},
+          "password": {"type": "string", "minLength": 1, "maxLength": 1024, "writeOnly": true}
+        }
+      }}}},
+      "responses": {
+        "200": {"description": "Authenticated. Raw token is returned only here; response is not cacheable.", "content": {"application/json": {"schema": {
+          "type": "object", "required": ["access_token", "token_type", "expires_at", "user"], "properties": {
+            "access_token": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+            "token_type": {"type": "string", "const": "Bearer"},
+            "expires_at": {"type": "string", "format": "date-time"},
+            "user": {"$ref": "#/components/schemas/User"}
+          }
+        }}}},
+        "401": {"$ref": "#/components/responses/Unauthorized"},
+        "404": {"$ref": "#/components/responses/NotFound"},
+        "422": {"description": "Invalid input", "content": {"application/json": {"schema": {
+          "type": "object", "required": ["message", "errors"], "properties": {
+            "message": {"type": "string"},
+            "errors": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}}
+          }
+        }}}},
+        "429": {"description": "Too many login attempts", "headers": {"Retry-After": {"schema": {"type": "integer"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+      }
+    }},
+    "/me": {"get": {
+      "operationId": "currentUser",
+      "responses": {
+        "200": {"description": "Current active user; does not extend token expiry", "content": {"application/json": {"schema": {
+          "type": "object", "required": ["user"], "properties": {"user": {"$ref": "#/components/schemas/User"}}
+        }}}},
+        "401": {"$ref": "#/components/responses/Unauthorized"},
+        "404": {"$ref": "#/components/responses/NotFound"}
+      }
+    }},
+    "/logout": {"post": {
+      "operationId": "logout", "description": "Revokes only the presented token. Other device tokens remain valid.",
+      "responses": {
+        "204": {"description": "Token revoked; no response body"},
+        "401": {"$ref": "#/components/responses/Unauthorized"},
+        "404": {"$ref": "#/components/responses/NotFound"}
+      }
+    }}
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "Opaque random token"}},
+    "schemas": {
+      "Error": {"type": "object", "required": ["message"], "properties": {"message": {"type": "string"}}},
+      "User": {"type": "object", "required": ["id", "tenant_id", "name", "email", "role"], "additionalProperties": false, "properties": {
+        "id": {"type": "string", "pattern": "^[0-9]+$"},
+        "tenant_id": {"type": "string", "pattern": "^[0-9]+$"},
+        "name": {"type": "string"}, "email": {"type": "string", "format": "email"},
+        "role": {"type": "string", "enum": ["administrator", "manager", "technician"]}
+      }}
+    },
+    "responses": {
+      "Unauthorized": {"description": "Invalid credentials, missing/invalid/expired/revoked/wrong-tenant token, inactive/deleted employee, or password changed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "NotFound": {"description": "Invalid tenant host, unknown tenant, or disabled tenant", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+    }
+  }
+}

@@ -1,0 +1,59 @@
+name: Deploy development
+
+on:
+  workflow_run:
+    workflows: [Development baseline]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: development-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: development
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Deploy verified commit over SSH
+        shell: bash
+        env:
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+          DEV_HOST: ${{ vars.DEV_HOST }}
+          DEV_USER: ${{ vars.DEV_USER }}
+          DEV_PORT: ${{ vars.DEV_PORT || '22' }}
+          DEV_PATH: ${{ vars.DEV_PATH }}
+          DEV_RESTART_COMMAND: ${{ vars.DEV_RESTART_COMMAND }}
+          DEV_SSH_KEY: ${{ secrets.DEV_SSH_KEY }}
+          DEV_KNOWN_HOSTS: ${{ secrets.DEV_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for name in DEV_HOST DEV_USER DEV_PATH DEV_RESTART_COMMAND DEV_SSH_KEY DEV_KNOWN_HOSTS; do
+            test -n "${!name}" || { echo "Configure $name in the development environment."; exit 1; }
+          done
+          [[ "$DEV_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$DEV_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
+          [[ "$DEV_PORT" =~ ^[0-9]+$ ]]
+          [[ "$DEPLOY_SHA" =~ ^[a-f0-9]{40}$ ]]
+          install -m 700 -d "$HOME/.ssh"
+          trap 'rm -f "$HOME/.ssh/development_key"' EXIT
+          printf '%s\n' "$DEV_SSH_KEY" > "$HOME/.ssh/development_key"
+          chmod 600 "$HOME/.ssh/development_key"
+          printf '%s\n' "$DEV_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf -v remote_command 'bash -s -- %q %q %q' "$DEV_PATH" "$DEPLOY_SHA" "$DEV_RESTART_COMMAND"
+          ssh -i "$HOME/.ssh/development_key" -p "$DEV_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 "$DEV_USER@$DEV_HOST" "$remote_command" < scripts/deploy-development.sh
