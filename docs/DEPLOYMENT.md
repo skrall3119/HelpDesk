@@ -1,36 +1,96 @@
-# Development deployment (Fedora / Nginx / PHP-FPM)
+# Separate development environments on one Fedora server
 
-Owner decision: automatically deploy `main` **after** the `Development baseline` CI workflow succeeds. No production deployment. The workflow deploys the exact verified SHA, skips superseded commits, refuses tracked server edits/diverged history, and preserves `.env`, `APP_KEY`, database, and untracked files. Failures after maintenance begins leave the application in maintenance mode for inspection; database migrations are never automatically reversed.
+Use one Nginx installation and one PostgreSQL installation, with independent code,
+configuration, databases and Laravel storage. Only the integration checkout is
+updated automatically from main after CI passes.
 
-Observed server: user `ajanci`, existing Git checkout `/home/ajanci/projects/caselantern`, old non-Git copy `/var/www/caselantern/alex`, Nginx and PHP-FPM. Keep both existing directories. The new managed checkout is `/var/www/caselantern/development`; the private Nginx site listens on loopback port 8000. The deploy user needs PHP, Composer, Node/npm, Git, curl and flock in its noninteractive PATH.
+## Proposed layout
 
-## 1. Prepare a new checkout
+These are defaults to configure, not claims about existing Nginx bindings. Check
+ports with `sudo ss -ltnp` before using them. Keep working developer Nginx sites.
 
-The owner currently prefers keeping this change local. Use the supplied `helpdesk-auth-dev.bundle` for the first server checkout; the GitHub workflow cannot run until the change is later published and merged by the owner.
+| Environment | Checkout | Database | Suggested loopback port |
+| --- | --- | --- | --- |
+| Alex | /home/ajanci/projects/caselantern (existing) | caselantern_alex | 8000 |
+| Friend | Their existing checkout (choose with them) | caselantern_friend | 8001 |
+| Integration | /var/www/caselantern/development (new) | caselantern_integration | 8002 |
 
-From Windows PowerShell, substitute the SSH server address and use your usual `-i` key option if needed:
+Each developer controls their branch and migrations in their own database.
+Integration tracks main. Never point automation at either developer checkout.
+Tests use additional disposable databases ending in `_test`, not any of these
+three databases. Separate databases isolate accidental schema/data changes;
+the existing shared PostgreSQL login roles do not provide security isolation
+between developers who possess those credentials. Per-developer database roles
+and PHP-FPM users are later hardening if mutually untrusted access is a concern.
 
-```powershell
-scp C:\Users\alexj\Documents\ChatGPT\helpdeks\helpdesk-auth-dev.bundle ajanci@YOUR_SERVER:~/helpdesk-auth-dev.bundle
-```
+## 1. Create databases without changing the current database
 
-On the server, with `/var/www/caselantern/development` empty:
+Keep the existing database and its data intact. Do not rename it, reset it, or
+restore over it. These commands create NEW empty databases and fail if a name
+already exists. Run only for missing names:
 
 ```bash
-sudo install -d -o ajanci -g ajanci /var/www/caselantern/development
-git clone -b codex/bearer-auth-dev-deploy ~/helpdesk-auth-dev.bundle /var/www/caselantern/development
-cd /var/www/caselantern/development
-git remote set-url origin https://github.com/skrall3119/HelpDesk.git
-composer install --no-interaction --prefer-dist
-npm ci
-npm run build
+sudo -u postgres createdb -O caselantern_migrator caselantern_alex
+sudo -u postgres createdb -O caselantern_migrator caselantern_friend
+sudo -u postgres createdb -O caselantern_migrator caselantern_integration
 ```
 
-Continue below with copying the working environment and the one-time setup. Do not switch this checkout to main until the authentication/deployment change has actually been merged there.
+The existing `caselantern_migrator` and `caselantern_app` roles are cluster-wide;
+do not rerun `development-roles.sql`. The restricted authentication lookup role
+is also cluster-wide: run `database/setup/authentication-role.sql` once only if
+not already created. If pg_hba.conf restricts database names, add the three new
+names for the existing runtime/migration roles using the existing SCRAM policy,
+then reload PostgreSQL configuration. Do not change authentication to trust.
 
-### Alternative: checkout from GitHub after publication
+This starts each environment empty. If existing tenant data is needed, plan a
+backup/restore into the NEW databases separately; do not silently move or copy
+credentials/data. Otherwise use the existing provisioning command after migration
+(see TENANT_PROVISIONING.md).
 
-After this change is merged to main, run:
+## 2. Configure each checkout independently
+
+In each developer checkout, preserve the current `.env` and APP_KEY, back up `.env`
+privately, then set its own DB_DATABASE from the table above. Set:
+
+```dotenv
+DEPLOYMENT_ENVIRONMENT=developer
+DB_CONNECTION=pgsql
+DB_URL=
+TENANT_BASE_DOMAIN=localhost
+```
+
+Set APP_URL to that checkout's Nginx URL. Use its own storage directory, cache,
+sessions, logs and assets; do not symlink these to the other checkout. File cache
+and sessions already default to checkout-local paths. If using Redis instead,
+configure separate connection databases/prefixes. Browser development on different
+localhost ports shares hostname storage, so use separate browser profiles when
+switching environments with saved bearer tokens.
+
+Retain separate runtime and migration role credentials. After checking the database
+name privately, apply migrations in THAT checkout:
+
+```bash
+php artisan config:clear
+php artisan migrate --database=pgsql_migrator --force
+```
+
+Apply runtime grants once in each new database (from any up-to-date checkout):
+
+```bash
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d caselantern_alex < database/setup/runtime-grants.sql
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d caselantern_friend < database/setup/runtime-grants.sql
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d caselantern_integration < database/setup/runtime-grants.sql
+```
+
+Only run a grant command after that database has been migrated. Future main
+deployments migrate integration only. Developer databases follow their respective
+branches. Once a migration is applied to a persistent environment, use forward
+migrations rather than rewriting history.
+
+## 3. Bootstrap the integration checkout once
+
+After the changes are merged, create a NEW checkout; do not overwrite existing
+files or either developer checkout:
 
 ```bash
 sudo install -d -o ajanci -g ajanci /var/www/caselantern/development
@@ -39,24 +99,49 @@ cd /var/www/caselantern/development
 composer install --no-interaction --prefer-dist
 npm ci
 npm run build
+test ! -e .env && install -m 600 .env.example .env
 ```
 
-To test before merge, fetch and switch to `codex/bearer-auth-dev-deploy` after cloning. Automatic deployment requires returning the managed checkout to `main` after merge.
+Configure this NEW `.env` privately with existing role passwords and:
 
-Copy the **working** environment locally on the server, not through chat. The Git checkout is the preferred source; verify it exists and is the environment you have been using. If only the older copy has a working `.env`, explicitly substitute that path. Do not overwrite an existing destination `.env` and do not generate a new application key:
+```dotenv
+APP_ENV=local
+APP_DEBUG=false
+APP_URL=http://localhost:8002
+TENANT_BASE_DOMAIN=localhost
+DEPLOYMENT_ENVIRONMENT=integration
+DB_CONNECTION=pgsql
+DB_DATABASE=caselantern_integration
+DB_URL=
+```
+
+Set DB_USERNAME/DB_PASSWORD to the restricted runtime role and
+DB_MIGRATION_USERNAME/DB_MIGRATION_PASSWORD to the migration role. Generate an
+APP_KEY only for this new, unused installation (`php artisan key:generate`);
+never rotate the keys in existing environments. Then:
 
 ```bash
-test -f /home/ajanci/projects/caselantern/.env
-test ! -e .env && install -m 600 /home/ajanci/projects/caselantern/.env .env
+php artisan config:clear
+php artisan caselantern:check-deployment caselantern_integration
+php artisan migrate --database=pgsql_migrator --force
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d caselantern_integration < database/setup/runtime-grants.sql
+php artisan config:cache
 ```
 
-Edit the copied `.env`: set `TENANT_BASE_DOMAIN=localhost`, `APP_URL=http://localhost:8000`, `APP_DEBUG=false`. Retain its key and working DB credentials; runtime must use `caselantern_app`, with separate migration credentials configured. Confirm these values privately before migration.
+The deployment check connects as both roles and verifies the actual database
+name before maintenance or migrations. It refuses developer environments,
+production, and database names not ending in `_integration`. Install this command
+and configure integration manually before enabling automation; an older checkout
+without the command fails closed.
 
-Run the one-time lookup-role setup and forward migrations in [AUTHENTICATION.md](AUTHENTICATION.md). If that role already exists, inspect its attributes/membership instead of rerunning the CREATE ROLE script. No database reset is required. Run the documented tests against a disposable test database before using the APIs.
+## 4. Add only the integration Nginx site
 
-## 2. Configure permissions and the private Nginx site
+Keep existing developer sites. `deploy/nginx-development.conf` is a template for
+the NEW integration checkout on 127.0.0.1:8002. Confirm the port is free and that
+the existing `php-fpm` upstream is defined before installation. If selecting a
+different port, update the template, APP_URL and GitHub DEV_HEALTH_URL together.
 
-The observed PHP-FPM workers run as `apache`. These ACLs allow that worker to read the environment and write Laravel runtime directories without making them world-writable:
+The observed FPM worker user is `apache`. On the new checkout:
 
 ```bash
 sudo dnf install -y acl policycoreutils-python-utils
@@ -68,62 +153,59 @@ sudo semanage fcontext -a -t httpd_sys_rw_content_t '/var/www/caselantern/develo
 sudo semanage fcontext -a -t httpd_sys_rw_content_t '/var/www/caselantern/development/bootstrap/cache(/.*)?'
 sudo restorecon -Rv /var/www/caselantern/development
 sudo setsebool -P httpd_can_network_connect_db on
-sudo cp deploy/nginx-development.conf /etc/nginx/conf.d/caselantern-development.conf
-sudo nginx -t
-sudo systemctl reload nginx
-sudo systemctl reload php-fpm
-curl --fail http://127.0.0.1:8000/up
 ```
 
-The file-context commands are one-time setup; use `semanage fcontext -m` when a matching custom rule already exists. Fedora must permit Nginx to bind port 8000: check `sudo semanage port -l | grep http_port_t`; if 8000 is absent, add it with `sudo semanage port -a -t http_port_t -p tcp 8000`. Do not open port 8000 in the public firewall. The template uses the `php-fpm` upstream already seen in this server's Nginx configuration; `nginx -t` verifies it before reload.
+For existing custom file-context rules use `-m` rather than `-a`. Check
+`sudo semanage port -l | grep http_port_t`; if 8002 is unassigned, add it with
+`sudo semanage port -a -t http_port_t -p tcp 8002`. If assigned to another SELinux
+service type, choose a free permitted port instead of reassigning it blindly.
+Then install the new site only if its destination does not already exist:
 
-From Windows, keep your existing SSH host/key, with forwarding:
-
-```powershell
-ssh -i "$env:USERPROFILE\.ssh\YOUR_SERVER_KEY" -o IdentitiesOnly=yes -N -L 8000:127.0.0.1:8000 ajanci@YOUR_SERVER
+```bash
+test ! -e /etc/nginx/conf.d/caselantern-development.conf && sudo cp deploy/nginx-development.conf /etc/nginx/conf.d/caselantern-development.conf
+sudo nginx -t && sudo systemctl reload nginx
+curl --fail http://127.0.0.1:8002/up
 ```
 
-Open `http://YOUR_TENANT_SLUG.localhost:8000`. For a direct server-side check, use curl's `--resolve YOUR_TENANT_SLUG.localhost:8000:127.0.0.1`. The tenant slug is the one provisioned in your database, not the employee username.
+Use SSH forwarding, e.g. `ssh -N -L 8002:127.0.0.1:8002 ajanci@YOUR_SERVER`,
+then open `http://YOUR_TENANT_SLUG.localhost:8002`. Do not expose these loopback
+development ports publicly. Use the provisioned tenant slug, not a developer name.
 
-## 3. Give automation narrowly scoped restart access
+## 5. Enable automatic deployment for integration only
 
-Verify `command -v systemctl` is `/usr/bin/systemctl`. Use `sudo visudo -f /etc/sudoers.d/caselantern-development` to add:
+Create GitHub environment `development`, restricted to main. Configure:
 
-```text
-ajanci ALL=(root) NOPASSWD: /usr/bin/systemctl reload php-fpm
-```
-
-Verify with `sudo -n /usr/bin/systemctl reload php-fpm`. This is the only privileged command the deployment workflow needs. Database role bootstrap and Nginx configuration remain one-time administrator steps.
-
-## 4. Configure GitHub's development environment
-
-In repository Settings → Environments, create `development` and restrict deployment branches to `main`. For fully automatic deployment, do not require reviewer approval for this development environment.
-
-Environment variables:
-
-| Name | Value |
+| Variable | Value |
 | --- | --- |
-| `DEV_HOST` | Server's SSH IP or DNS name reachable by GitHub's runner |
-| `DEV_USER` | `ajanci` |
-| `DEV_PORT` | SSH port (default `22`) |
-| `DEV_PATH` | `/var/www/caselantern/development` |
-| `DEV_RESTART_COMMAND` | `sudo -n /usr/bin/systemctl reload php-fpm` |
+| DEV_HOST | SSH address reachable from the runner |
+| DEV_USER | ajanci (or a dedicated integration deployment user) |
+| DEV_PORT | SSH port, normally 22 |
+| DEV_PATH | /var/www/caselantern/development |
+| DEV_DATABASE | caselantern_integration |
+| DEV_HEALTH_URL | http://127.0.0.1:8002/up |
+| DEV_RESTART_COMMAND | See PHP-FPM note below |
 
-Environment secrets:
+Secrets: DEV_SSH_KEY (dedicated deployment private key) and DEV_KNOWN_HOSTS
+(verified OpenSSH known_hosts entry). Keep secrets out of chat and Git. Add the
+public deployment key to the server user's authorized_keys with `restrict`.
+Verify the host fingerprint through a trusted SSH connection before storing it.
 
-| Name | Value |
-| --- | --- |
-| `DEV_SSH_KEY` | Dedicated deployment SSH private key (never commit or paste into chat) |
-| `DEV_KNOWN_HOSTS` | Verified OpenSSH known_hosts entry for the server and SSH port |
+PHP-FPM: reloading the shared service affects every pool. Prefer timestamp-based
+OPcache validation for development and set DEV_RESTART_COMMAND to `true` only
+after confirming `opcache.validate_timestamps=1` in the FPM configuration and
+its revalidation interval is acceptable. Otherwise configure a separate integration
+FPM service/socket and use its narrowly scoped reload command. Do not assume that
+creating a pool inside the same service gives independent service reloads.
+If choosing a service reload, grant only that exact command through sudoers.
+The workflow never changes existing Nginx sites or developer checkout files.
 
-Create a separate Ed25519 key for automation, add its public key to `ajanci`'s `~/.ssh/authorized_keys` with `restrict` to disable forwarding/PTY, and store only its private key in GitHub's secret. Verify the host-key fingerprint through your existing trusted SSH connection (`sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`) before saving the matching known_hosts entry. Do not blindly trust an unverified scan. The server still needs inbound SSH connectivity from the runner; do not broaden access without reviewing your current SSH/firewall policy.
+Main CI uses disposable PostgreSQL databases, then the deployment workflow sends
+the verified commit to integration. A checkout lock serializes integration deploys;
+run heavy developer builds/tests at different times on the 1-vCPU/2-GB server.
+The health check verifies application boot, not database authentication; run an
+initial login/me/logout smoke check in each newly provisioned environment.
 
-The workflow uses SSH host-key checking, no passwords, no secret echoing, and no repository-supplied credentials. Laravel migrations use the server's existing migration configuration. Database credentials and application key stay on the server.
-
-## 5. Normal deployment and failure recovery
-
-Merge the reviewed, passing change to `main`. In Actions, watch **Development baseline**, then **Deploy development**. The server stays on main; no manual pulls are required afterward. The workflow installs locked dependencies, builds assets, migrates forward, caches configuration/routes/views, reloads PHP-FPM, and verifies `/up` on loopback. `/up` verifies HTTP/application boot; authentication correctness is covered by the CI tests and the initial tenant login smoke check.
-
-If setup is incomplete when the first main build passes, deployment fails with the missing variable/secret or SSH error. After fixing setup, rerun the failed **Deploy development** job for the current main SHA. If main has advanced, deploy only after that newer revision passes CI. When application maintenance has started, fix the reported error and rerun; use `php artisan up` manually only after confirming application health. Do not automatically roll back migrations or overwrite server edits.
-
-Implementation was reviewed statically in the authoring workspace; PHP/PostgreSQL tests and real server deployment remain to be executed, per owner preference.
+A failed deployment remains in integration maintenance mode. Fix and rerun for
+the current passing main commit. Never automatically roll back databases. Neither
+developer database is migrated by this workflow. Actual server provisioning and
+Nginx configuration must be performed by the owner using the commands above.

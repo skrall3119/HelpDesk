@@ -108,6 +108,7 @@ jobs:
 
       - name: Application checks including mandatory real PostgreSQL tests
         run: |
+          bash -n scripts/deploy-development.sh
           vendor/bin/pint --test -v app tests
           vendor/bin/phpunit --fail-on-skipped
 
