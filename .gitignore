@@ -25,3 +25,6 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local server operations notes
+/docs/INTERNAL_RUNBOOK.md

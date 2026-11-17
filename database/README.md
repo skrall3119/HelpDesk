@@ -1,7 +1,7 @@
 # CaseLantern database reference
 
 Schema and application invariants for the team. Server administration, migrations,
-and verification commands are in the [internal runbook](../docs/INTERNAL_RUNBOOK.md).
+and verification procedures are maintained separately in an untracked local runbook.
 
 ## Migration history
 
