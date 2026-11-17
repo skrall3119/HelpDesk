@@ -41,7 +41,7 @@
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "npm ci",
             "npm run build",
-            "@php -r \"fwrite(STDOUT, 'Dependencies installed. Follow docs/DEVELOPMENT.md for credentials, initial key generation and owner migrations.'.PHP_EOL);\""
+            "@php -r \"fwrite(STDOUT, 'Dependencies installed. See docs/INTERNAL_RUNBOOK.md for our server procedures.'.PHP_EOL);\""
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",

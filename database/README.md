@@ -1,60 +1,22 @@
-# CaseLantern PostgreSQL schema
+# CaseLantern database reference
 
-The schema targets PostgreSQL 17/18 without extensions. The original SQL baseline remains unchanged. Apply the forward migration for the confirmed single-name and Closed-only workflow. Both Laravel migration wrappers and the application scaffold are in the repository. For a fresh checkout or the existing server, use [the development guide](../docs/DEVELOPMENT.md) and its dedicated `pgsql_migrator` connection; direct SQL below is an alternative path, not an additional install step.
+Schema and application invariants for the team. Server administration, migrations,
+and verification commands are in the [internal runbook](../docs/INTERNAL_RUNBOOK.md).
 
-Apply once to a fresh database as a migration owner:
+## Migration history
 
-```sh
-psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f database/migrations/001_initial.sql
-psql "$DATABASE_URL" -X -1 -v ON_ERROR_STOP=1 -f database/migrations/002_names_and_ticket_workflow.sql
-psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f database/tests/schema.sql
-```
-
-Run tests in a disposable database containing the migration, as a superuser able to create a test role. Fixtures and that role roll back; identity sequences may advance. The migration does not drop or silently skip existing tables.
-
-## Existing Laravel database
-
-The server has recorded `2026_10_29_195159_establish_caselantern_baseline`. Keep that migration intact. Copy both new migration files into the application's `database/migrations` directory (or pull them if this repository is the application checkout):
-
-- `002_names_and_ticket_workflow.sql`
-- `2026_11_02_000001_reconcile_names_and_ticket_workflow.php`
-
-From the Laravel root, supply process-scoped `DB_MIGRATION_USERNAME` and `DB_MIGRATION_PASSWORD` as shown in the development guide, then use the migration-owner connection:
-
-```sh
-php artisan migrate:status --database=pgsql_migrator
-php artisan migrate --database=pgsql_migrator --pretend
-php artisan migrate --database=pgsql_migrator
-php artisan migrate:status --database=pgsql_migrator
-```
-
-Use either the Laravel wrapper or direct SQL, never both on the same database. The wrapper uses Laravel's PostgreSQL migration transaction; direct SQL requires `psql -1`. The SQL has no embedded transaction so either caller can manage the entire change atomically. It is intentionally not rerunnable. Do not run `migrate:fresh` or roll back the baseline to apply this update. The new migration's `down()` refuses a lossy reversal.
-
-The migration locks users, contacts, and tickets, temporarily removes FORCE RLS for the owner backfill, and restores FORCE RLS and all existing triggers before commit. Run as the table owner or a maintenance superuser, never the runtime account. Name backfills combine first/last names with a space. Existing Resolved tickets become Closed, using their prior resolution timestamp; existing audit snapshots remain unchanged, and no employee closure event is fabricated. Legacy audit entries may still contain `resolved` and `resolved_at`; history rendering must tolerate these old snapshots. New writes use only the new fields.
-
-New application code must use the post-forward-migration fields. The scaffold and provisioning command are present; domain forms and authentication remain future slices.
-
-## Upgrade validation
-
-On a **disposable database** with only `001_initial.sql` applied, run the seeded upgrade regression first. It rolls back the upgrade, leaving the baseline in place. Then apply the forward migration and run the current schema suite:
-
-```sh
-psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f database/tests/upgrade.sql
-psql "$TEST_DATABASE_URL" -X -1 -v ON_ERROR_STOP=1 -f database/migrations/002_names_and_ticket_workflow.sql
-psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f database/tests/schema.sql
-```
-
-The upgrade test checks cross-tenant name backfill, legacy resolution conversion, timestamp/audit preservation, and restored FORCE RLS. Use the same table owner for the baseline as in deployment to exercise the owner migration path. These new checks have not yet been executed in the authoring workspace, which lacks PostgreSQL/PHP; prior baseline test passes do not validate this update.
-
-## Database naming
-
-For a fresh installation, use database `caselantern`, migration role `caselantern_migrator`, and restricted runtime role `caselantern_app`. Role privileges and tenant isolation requirements below still apply. The SQL migration does not create or hard-code these deployment accounts.
-
-If you already created `helpdesk`, `helpdesk_migrator`, or `helpdesk_app` while following the initial server walkthrough, they remain usable. The product rename does not rename a live database or its accounts. Keep using the existing names in connection settings until a deliberate database/account rename is performed; do not create a second database accidentally. The disposable test role is now `caselantern_schema_test_runtime` and rolls back with the test transaction.
+The original baseline is preserved. Migration 002 replaces first/last names with
+`name` and converts Resolved tickets to Closed while preserving timestamps and
+audit history. Legacy activity snapshots may still contain `resolved` and
+`resolved_at`; history consumers must tolerate them. Its backfill temporarily
+removes FORCE RLS for the owner and restores policies/triggers before commit.
+Migration 003 adds bearer tokens and the narrowly scoped tenant lookup function.
+Use reviewed forward migrations for persistent data; these migrations reject
+lossy reversal.
 
 ## Model and provisional defaults
 
-- Seven tables: tenants, users, clients, contacts, tickets, ticket_comments, ticket_activities.
+- Seven domain tables: tenants, users, clients, contacts, tickets, ticket_comments, ticket_activities. Authentication adds access_tokens with hashed tokens, password fingerprints, and fixed expiry.
 - Bigint identity keys generated by PostgreSQL, timezone-aware timestamps, and automatic `updated_at`. Tests use `OVERRIDING SYSTEM VALUE` for explicit fixture IDs.
 - Fixed roles: administrator, manager, technician. Application policies map capabilities to roles; custom roles and categories are deferred.
 - User email uniqueness is case-insensitive within each tenant, including deleted users. Login must resolve the tenant first. `password` stores a framework-generated secure hash; the database does not hash or validate password strength.
@@ -70,7 +32,7 @@ If you already created `helpdesk`, `helpdesk_migrator`, or `helpdesk_app` while 
 
 ## Runtime security
 
-Use separate migration and runtime identities. Runtime must be a non-owner, non-superuser with `NOBYPASSRLS`, without DDL, TRUNCATE, or table DELETE privileges. All seven tables force row-level security. Missing tenant context returns no rows and denies writes; superusers and BYPASSRLS roles can bypass policies.
+Use separate migration and runtime identities. Runtime must be a non-owner, non-superuser with `NOBYPASSRLS`, without DDL, TRUNCATE, or domain-table DELETE privileges. Authentication grants DELETE on access_tokens for current-token logout. Domain and token tables force row-level security. Missing tenant context returns no rows and denies writes; superusers and BYPASSRLS roles can bypass policies.
 
 Supply context from trusted authentication state in every transaction:
 
@@ -82,7 +44,7 @@ SELECT set_config('app.user_id', '456', true);
 COMMIT;
 ```
 
-The `true` flag makes settings transaction-local, preventing context leakage through pooled connections. Settings are trusted server context, not authentication; browsers must never receive database credentials or control these values. Tenant provisioning and tenant-slug lookup before login need separately controlled access.
+The `true` flag makes settings transaction-local, preventing context leakage through pooled connections. Settings are trusted server context, not authentication; browsers must never receive database credentials or control these values. Tenant provisioning uses the dedicated owner connection. The SECURITY DEFINER lookup_tenant function exposes only tenant ID and active state for an exact slug through a restricted no-login role and fixed search path.
 
 For a status action, set the validated reason immediately before its UPDATE, in the same transaction as actor/tenant context. Clear it immediately afterward if the transaction performs other actions; transaction-local values persist until commit/rollback and must not be reused for a different ticket action:
 
@@ -118,6 +80,6 @@ WHERE deleted_at IS NULL
       @@ websearch_to_tsquery('english', :query);
 ```
 
-The SQL suite checks tenant/client relationships, required contacts, completion constraints, reopening timestamps, numbering, email/primary-contact uniqueness, history, restricted deletion, and runtime writes under RLS. Application permissions and concurrent claim integration require tests once the application exists.
+The SQL suite checks tenant/client relationships, required contacts, completion constraints, reopening timestamps, numbering, email/primary-contact uniqueness, history, restricted deletion, and runtime writes under RLS. Application capability policies and concurrent claim behavior require their own integration coverage as those features are implemented.
 
 The restricted-contact-deletion check expects SQLSTATE `23503` on PostgreSQL 17 and `23001` on PostgreSQL 18. Both represent the expected rejection of deleting a referenced contact; other foreign-key assertions retain their specific expected codes.
