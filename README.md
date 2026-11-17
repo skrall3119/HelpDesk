@@ -18,7 +18,8 @@ are maintained in the [sprint schedule](docs/SPRINT_SCHEDULE.md#progress).
 ## Start here
 
 - [Development setup: fresh checkout and existing server](docs/DEVELOPMENT.md)
-- [Bearer authentication and server verification](docs/AUTHENTICATION.md)
+- [Authentication API reference, examples, and Postman walkthrough](docs/AUTHENTICATION.md)
+- [OpenAPI contract for import into API clients](docs/openapi.json)
 - [Automated development deployment](docs/DEPLOYMENT.md)
 - [Tenant/admin provisioning](docs/TENANT_PROVISIONING.md)
 - [Product rules and implementation plan](docs/PROJECT_PLAN.md)

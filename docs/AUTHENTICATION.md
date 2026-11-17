@@ -1,4 +1,4 @@
-# Bearer authentication
+# Authentication API reference
 
 Owner decision (2026-11-11): bearer authentication with a **fixed 48-hour lifetime** replaces the cookie-session default in the project plan for these APIs. No refresh token or sliding expiry. An expired token requires email/password login again. Recovery/setup and frontend login screens are separate work.
 
@@ -15,6 +15,146 @@ See [openapi.json](openapi.json) for the request/response contract. IDs are JSON
 Tokens contain 256 random bits. Only their SHA-256 hashes are stored. Each request reloads the active employee in the resolved tenant, verifies the password fingerprint, and sets transaction-local actor context. Password changes invalidate existing tokens. Logout revokes the current token; other device tokens remain valid until their own expiry or account/password invalidation. Expired records grant no access even if retained; scheduled retention cleanup may be added separately.
 
 For a browser client, prefer keeping bearer tokens in memory; persistent browser storage exposes them to injected JavaScript. Never put tokens in URLs or logs. A later persistent-login design needs an explicit storage decision. The 48-hour server expiry remains fixed regardless of client storage.
+
+## Base URL and headers
+
+Use `https://<tenant-slug>.<base-domain>/api/v1`. For example, a configured
+base domain of `dev.example.com` and an existing tenant `acme` gives
+`https://acme.dev.example.com/api/v1`. The example domain is a placeholder;
+DNS, HTTPS, and `TENANT_BASE_DOMAIN` must match your environment. The bare base
+domain does not select a tenant. A token from one tenant cannot authenticate on another.
+
+Send `Accept: application/json` on every request and `Content-Type: application/json`
+when sending a JSON body. Login does not require authorization. Protected requests use:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+The token is opaque, not a JWT. Use employee credentials provisioned for the selected
+tenant, not PostgreSQL or server credentials. Public registration, password recovery,
+token refresh, and capability-list endpoints are not implemented.
+
+## POST /api/v1/login
+
+Required JSON fields:
+
+| Field | Rules |
+| --- | --- |
+| `email` | String, valid RFC email, maximum 254 characters; account lookup is case-insensitive within the tenant |
+| `password` | Nonempty string, maximum 1024 characters; must match the employee's password |
+
+Example request (synthetic credentials):
+
+```json
+{
+  "email": "admin@example.com",
+  "password": "Synthetic example password"
+}
+```
+
+Successful response: **200 OK**. This synthetic token is illustrative and cannot be used:
+
+```json
+{
+  "access_token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "token_type": "Bearer",
+  "expires_at": "2026-11-19T12:00:00.000000Z",
+  "user": {
+    "id": "42",
+    "tenant_id": "7",
+    "name": "Example Administrator",
+    "email": "admin@example.com",
+    "role": "administrator"
+  }
+}
+```
+
+`expires_at` is a UTC timestamp 48 hours after issuance (the example assumes issuance
+on November 17 at 12:00 UTC). Each successful login creates a separate token.
+The user object excludes password hashes; IDs are strings. Roles are
+`administrator`, `manager`, or `technician`.
+
+## GET /api/v1/me
+
+Requires bearer authorization and no request body. Returns **200 OK** with
+`{"user": {...}}`, using the same user fields shown above. Account data is loaded
+again on each request. The response does not include a capabilities list, and
+calling this endpoint does not extend token expiry.
+
+## POST /api/v1/logout
+
+Requires bearer authorization and no request body. Returns **204 No Content** with
+an empty body. Only the presented token is revoked. Calling `/me` or `/logout`
+again with that token returns **401**. Other tokens are unaffected by this logout.
+
+## Errors and retry behavior
+
+| Status | Applies to | Meaning / client action |
+| --- | --- | --- |
+| `401` | Login | Incorrect credentials or inactive/deleted employee; show the generic error |
+| `401` | Me, logout | Missing, invalid, expired, revoked, or wrong-tenant token; account inactive/deleted or password changed; require a fresh login |
+| `404` | All three | Invalid host or unknown/inactive tenant; check the URL and tenant configuration |
+| `422` | Login | Invalid request fields; show the field errors and correct the input |
+| `429` | Login | Rate limit reached; wait the number of seconds in `Retry-After` before retrying |
+
+Login's generic credential error is:
+
+```json
+{"message": "Invalid credentials."}
+```
+
+Protected requests normally return `{"message":"Unauthenticated."}` for 401.
+Validation errors include a field-indexed `errors` object; for example, omitting
+email while supplying a password:
+
+```json
+{
+  "message": "The email field is required.",
+  "errors": {"email": ["The email field is required."]}
+}
+```
+
+Use status codes and field keys rather than matching framework error text, which
+can vary. Tenant resolution happens before authentication and login throttling,
+so an invalid tenant host returns 404 even when credentials or tokens are missing.
+A 500 indicates a server failure, not invalid credentials; inspect server logs.
+
+## Manual Postman walkthrough
+
+You can import [openapi.json](openapi.json) using Postman's Import action, or create
+the three requests manually. Replace the example server variables with your actual
+tenant and base domain before sending any request.
+
+For manual requests, create a local `baseUrl` variable containing your full tenant
+base URL, including `/api/v1` and no trailing slash. Then:
+
+1. Create `POST {{baseUrl}}/login`. Set Authorization to **No Auth**, add
+   `Accept: application/json`, and select **Body > raw > JSON**. Enter your actual
+   employee email and password. Expect **200** and copy `access_token`.
+2. Create `GET {{baseUrl}}/me`. Set Authorization to **Bearer Token** and paste
+   only the token value (Postman adds the `Bearer` prefix). Add the Accept header.
+   Expect **200** and confirm the returned user and tenant.
+3. Create `POST {{baseUrl}}/logout` with the same bearer authorization and Accept
+   header, and no body. Expect **204** with an empty response.
+4. Resend the `/me` request with the old token. Expect **401**.
+
+Additional checks: `/me` without a token should return 401; a wrong password should
+return 401; login without an email should return 422. Login is limited to five
+attempts per tenant/email/minute and thirty per IP/minute, including successes.
+Do not repeatedly retry a 429; follow `Retry-After`.
+
+Keep real credentials and tokens out of committed collections, shared examples,
+screenshots, and logs. The examples in this guide and the contract are synthetic.
+
+## Keeping this reference current
+
+For every endpoint addition or behavior change, update [openapi.json](openapi.json)
+and the relevant Markdown guide in the same task. Include the method/path, tenant
+and authentication rules, request/response schemas and examples, validation,
+status codes, and any retry or token-lifecycle behavior. Check the contract against
+routes, controller validation, middleware, and meaningful HTTP tests. JSON parsing
+alone does not prove that the contract matches runtime behavior.
 
 ## Existing development server: one-time setup
 
