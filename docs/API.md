@@ -54,7 +54,7 @@ Returns the authenticated employee's current capability names:
 Administrator: all capabilities. Manager: all except `users.manage`,
 `settings.manage`, and `comments.edit_any`. Technician: the example above.
 Capabilities are UI hints; every mutation independently authorizes the actor.
-Status: 200, 401, or 404. No parameters or request body.
+Status: 200, 401, 404, 413, or 422. No parameters or request body; supplied fields are rejected.
 
 ## Owner decisions for this implementation
 
