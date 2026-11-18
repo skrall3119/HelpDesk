@@ -185,7 +185,7 @@ Response example:
     "name": "Example employee",
     "email": "employee@example.com",
     "role": "technician",
-    "active": true,
+    "active": false,
     "created_at": "2026-11-17T12:00:00.123456Z",
     "updated_at": "2026-11-17T12:00:00.123456Z",
     "deleted_at": null
@@ -215,7 +215,7 @@ Response example:
     "name": "Example employee",
     "email": "employee@example.com",
     "role": "technician",
-    "active": true,
+    "active": false,
     "created_at": "2026-11-17T12:00:00.123456Z",
     "updated_at": "2026-11-17T12:00:00.123456Z",
     "deleted_at": null
