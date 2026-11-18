@@ -2,10 +2,37 @@
 
 namespace Tests\Feature;
 
+use App\Auth\BearerTokens;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Tests\Support\ApiPostgresTest;
+use Tests\Support\ConcurrentRequests;
 
 class EmployeesPostgresTest extends ApiPostgresTest
 {
+    use ConcurrentRequests;
+
+    public function test_concurrent_administrator_demotions_leave_one_active_administrator(): void
+    {
+        $this->role('administrator');
+        $id = DB::table('users')->insertGetId(['tenant_id' => $this->pair['a']['tenant_id'], 'name' => 'Second admin', 'email' => 'second@example.test', 'password' => Hash::make('Synthetic password'), 'role' => 'administrator']);
+        $second = app(BearerTokens::class)->issue(User::findOrFail($id));
+        $requests = [];
+        foreach ([$this->pair['a']['user_id'] => $this->headers['Authorization'], $id => 'Bearer '.$second['access_token']] as $user => $authorization) {
+            $version = DB::table('users')->where('id', $user)->value('updated_at');
+            $requests[] = ['url' => $this->url('admin/users/'.$user), 'method' => 'PATCH', 'authorization' => $authorization, 'body' => ['role' => 'technician', 'updated_at' => $version]];
+        }
+        DB::commit();
+        $responses = $this->concurrentRequests($requests);
+        $statuses = array_column($responses, 'status');
+        sort($statuses);
+        $this->assertSame([200, 409], $statuses);
+        DB::beginTransaction();
+        DB::selectOne("SELECT set_config('app.tenant_id', ?, true)", [$this->pair['a']['tenant_id']]);
+        $this->assertSame(1, DB::table('users')->where('role', 'administrator')->where('active', true)->count());
+    }
+
     public function test_employee_creation_validation_role_restrictions_and_safe_output(): void
     {
         $body = ['name' => 'Employee', 'email' => 'employee@example.test', 'role' => 'technician', 'password' => '12345678'];
