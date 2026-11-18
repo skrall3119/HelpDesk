@@ -1,0 +1,1679 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CaseLantern Employee administration API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://{tenant}.{domain}/api/v1",
+      "variables": {
+        "tenant": {
+          "default": "acme"
+        },
+        "domain": {
+          "default": "example.com"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/admin/users": {
+      "get": {
+        "summary": "List employees",
+        "description": "List employees",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "deleted",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List employees",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$",
+                            "example": "42"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          },
+                          "email": {
+                            "type": "string",
+                            "format": "email",
+                            "maxLength": 254
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "administrator",
+                              "manager",
+                              "technician"
+                            ]
+                          },
+                          "active": {
+                            "type": "boolean"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "example": "2026-11-17T12:00:00.123456Z"
+                          },
+                          "updated_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "example": "2026-11-17T12:00:00.123456Z"
+                          },
+                          "deleted_at": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "example": "2026-11-17T12:00:00.123456Z"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "email",
+                          "role",
+                          "active",
+                          "created_at",
+                          "updated_at",
+                          "deleted_at"
+                        ]
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "per_page",
+                        "last_page",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": "42",
+                      "name": "Example employee",
+                      "email": "employee@example.com",
+                      "role": "technician",
+                      "active": true,
+                      "created_at": "2026-11-17T12:00:00.123456Z",
+                      "updated_at": "2026-11-17T12:00:00.123456Z",
+                      "deleted_at": null
+                    }
+                  ],
+                  "meta": {
+                    "current_page": 1,
+                    "per_page": 25,
+                    "total": 1,
+                    "last_page": 1
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create an employee with an initial password",
+        "description": "Create an employee with an initial password",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Create an employee with an initial password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email",
+                          "maxLength": 254
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "administrator",
+                            "manager",
+                            "technician"
+                          ]
+                        },
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "deleted_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "example": "2026-11-17T12:00:00.123456Z"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "email",
+                        "role",
+                        "active",
+                        "created_at",
+                        "updated_at",
+                        "deleted_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": {
+                    "id": "42",
+                    "name": "Example employee",
+                    "email": "employee@example.com",
+                    "role": "technician",
+                    "active": true,
+                    "created_at": "2026-11-17T12:00:00.123456Z",
+                    "updated_at": "2026-11-17T12:00:00.123456Z",
+                    "deleted_at": null
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "administrator",
+                      "manager",
+                      "technician"
+                    ]
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 72,
+                    "writeOnly": true,
+                    "description": "Maximum 72 UTF-8 bytes"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email",
+                  "role",
+                  "password"
+                ]
+              },
+              "example": {
+                "name": "Example employee",
+                "email": "employee@example.com",
+                "role": "technician",
+                "password": "Example123!"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{user}": {
+      "get": {
+        "summary": "Read an employee",
+        "description": "Read an employee",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "42"
+            }
+          },
+          {
+            "name": "deleted",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read an employee",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email",
+                          "maxLength": 254
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "administrator",
+                            "manager",
+                            "technician"
+                          ]
+                        },
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "deleted_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "example": "2026-11-17T12:00:00.123456Z"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "email",
+                        "role",
+                        "active",
+                        "created_at",
+                        "updated_at",
+                        "deleted_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": {
+                    "id": "42",
+                    "name": "Example employee",
+                    "email": "employee@example.com",
+                    "role": "technician",
+                    "active": true,
+                    "created_at": "2026-11-17T12:00:00.123456Z",
+                    "updated_at": "2026-11-17T12:00:00.123456Z",
+                    "deleted_at": null
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update employee name, email or role",
+        "description": "Update employee name, email or role",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "42"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Update employee name, email or role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email",
+                          "maxLength": 254
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "administrator",
+                            "manager",
+                            "technician"
+                          ]
+                        },
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "deleted_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "example": "2026-11-17T12:00:00.123456Z"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "email",
+                        "role",
+                        "active",
+                        "created_at",
+                        "updated_at",
+                        "deleted_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": {
+                    "id": "42",
+                    "name": "Example employee",
+                    "email": "employee@example.com",
+                    "role": "technician",
+                    "active": true,
+                    "created_at": "2026-11-17T12:00:00.123456Z",
+                    "updated_at": "2026-11-17T12:00:00.123456Z",
+                    "deleted_at": null
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "administrator",
+                      "manager",
+                      "technician"
+                    ]
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-17T12:00:00.123456Z"
+                  }
+                },
+                "required": [
+                  "updated_at"
+                ]
+              },
+              "example": {
+                "name": "Updated employee",
+                "updated_at": "2026-11-17T12:00:00.123456Z"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "delete employee",
+        "description": "delete employee",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "42"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "delete employee"
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-17T12:00:00.123456Z"
+                  }
+                },
+                "required": [
+                  "updated_at"
+                ]
+              },
+              "example": {
+                "updated_at": "2026-11-17T12:00:00.123456Z"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{user}/activate": {
+      "post": {
+        "summary": "activate employee",
+        "description": "activate employee",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "42"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "activate employee",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email",
+                          "maxLength": 254
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "administrator",
+                            "manager",
+                            "technician"
+                          ]
+                        },
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "deleted_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "example": "2026-11-17T12:00:00.123456Z"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "email",
+                        "role",
+                        "active",
+                        "created_at",
+                        "updated_at",
+                        "deleted_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": {
+                    "id": "42",
+                    "name": "Example employee",
+                    "email": "employee@example.com",
+                    "role": "technician",
+                    "active": true,
+                    "created_at": "2026-11-17T12:00:00.123456Z",
+                    "updated_at": "2026-11-17T12:00:00.123456Z",
+                    "deleted_at": null
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-17T12:00:00.123456Z"
+                  }
+                },
+                "required": [
+                  "updated_at"
+                ]
+              },
+              "example": {
+                "updated_at": "2026-11-17T12:00:00.123456Z"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{user}/deactivate": {
+      "post": {
+        "summary": "deactivate employee",
+        "description": "deactivate employee",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "42"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "deactivate employee",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email",
+                          "maxLength": 254
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "administrator",
+                            "manager",
+                            "technician"
+                          ]
+                        },
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "deleted_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "example": "2026-11-17T12:00:00.123456Z"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "email",
+                        "role",
+                        "active",
+                        "created_at",
+                        "updated_at",
+                        "deleted_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": {
+                    "id": "42",
+                    "name": "Example employee",
+                    "email": "employee@example.com",
+                    "role": "technician",
+                    "active": true,
+                    "created_at": "2026-11-17T12:00:00.123456Z",
+                    "updated_at": "2026-11-17T12:00:00.123456Z",
+                    "deleted_at": null
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-17T12:00:00.123456Z"
+                  }
+                },
+                "required": [
+                  "updated_at"
+                ]
+              },
+              "example": {
+                "updated_at": "2026-11-17T12:00:00.123456Z"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{user}/restore": {
+      "post": {
+        "summary": "restore employee",
+        "description": "restore employee",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "42"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "restore employee",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email",
+                          "maxLength": 254
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "administrator",
+                            "manager",
+                            "technician"
+                          ]
+                        },
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "deleted_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "example": "2026-11-17T12:00:00.123456Z"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "email",
+                        "role",
+                        "active",
+                        "created_at",
+                        "updated_at",
+                        "deleted_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": {
+                    "id": "42",
+                    "name": "Example employee",
+                    "email": "employee@example.com",
+                    "role": "technician",
+                    "active": true,
+                    "created_at": "2026-11-17T12:00:00.123456Z",
+                    "updated_at": "2026-11-17T12:00:00.123456Z",
+                    "deleted_at": null
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-17T12:00:00.123456Z"
+                  }
+                },
+                "required": [
+                  "updated_at"
+                ]
+              },
+              "example": {
+                "updated_at": "2026-11-17T12:00:00.123456Z"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      }
+    }
+  }
+}
