@@ -1,0 +1,1365 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CaseLantern Ticket history and restoration API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://{tenant}.{domain}/api/v1",
+      "variables": {
+        "tenant": {
+          "default": "acme"
+        },
+        "domain": {
+          "default": "example.com"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/deleted-tickets": {
+      "get": {
+        "summary": "List soft-deleted tickets",
+        "description": "List soft-deleted tickets",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List soft-deleted tickets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$",
+                            "example": "42"
+                          },
+                          "ticket_number": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$",
+                            "example": "42"
+                          },
+                          "client_id": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$",
+                            "example": "42"
+                          },
+                          "contact_id": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$",
+                            "example": "42"
+                          },
+                          "assigned_user_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[1-9][0-9]*$",
+                                "example": "42"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "created_by_user_id": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$",
+                            "example": "42"
+                          },
+                          "subject": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "priority": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "example": "2026-11-17T12:00:00.123456Z"
+                          },
+                          "updated_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "example": "2026-11-17T12:00:00.123456Z"
+                          },
+                          "closed_at": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "example": "2026-11-17T12:00:00.123456Z"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "deleted_at": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "example": "2026-11-17T12:00:00.123456Z"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ticket_number",
+                          "client_id",
+                          "contact_id",
+                          "assigned_user_id",
+                          "created_by_user_id",
+                          "subject",
+                          "status",
+                          "priority",
+                          "created_at",
+                          "updated_at",
+                          "closed_at",
+                          "deleted_at"
+                        ]
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "per_page",
+                        "last_page",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": "44",
+                      "ticket_number": "1",
+                      "client_id": "42",
+                      "contact_id": "43",
+                      "assigned_user_id": "7",
+                      "created_by_user_id": "7",
+                      "subject": "Network issue",
+                      "status": "open",
+                      "priority": "normal",
+                      "created_at": "2026-11-17T12:00:00.123456Z",
+                      "updated_at": "2026-11-17T12:00:00.123456Z",
+                      "closed_at": null,
+                      "deleted_at": "2026-11-17T12:00:00.123456Z"
+                    }
+                  ],
+                  "meta": {
+                    "current_page": 1,
+                    "per_page": 25,
+                    "total": 1,
+                    "last_page": 1
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/deleted-tickets/{ticket}": {
+      "get": {
+        "summary": "Read a deleted ticket and its current contact",
+        "description": "Read a deleted ticket and its current contact",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "42"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read a deleted ticket and its current contact",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "ticket_number": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "client_id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "contact_id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "assigned_user_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[1-9][0-9]*$",
+                              "example": "42"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "created_by_user_id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "subject": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "priority": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "closed_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "example": "2026-11-17T12:00:00.123456Z"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "deleted_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "example": "2026-11-17T12:00:00.123456Z"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50000
+                        },
+                        "contact": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[1-9][0-9]*$",
+                                  "example": "42"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 255
+                                },
+                                "email": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 254
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "phone": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 50
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "active": {
+                                  "type": "boolean"
+                                },
+                                "deleted_at": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "example": "2026-11-17T12:00:00.123456Z"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "email",
+                                "phone",
+                                "active",
+                                "deleted_at"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "ticket_number",
+                        "client_id",
+                        "contact_id",
+                        "assigned_user_id",
+                        "created_by_user_id",
+                        "subject",
+                        "status",
+                        "priority",
+                        "created_at",
+                        "updated_at",
+                        "closed_at",
+                        "deleted_at",
+                        "description",
+                        "contact"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": {
+                    "id": "44",
+                    "ticket_number": "1",
+                    "client_id": "42",
+                    "contact_id": "43",
+                    "assigned_user_id": "7",
+                    "created_by_user_id": "7",
+                    "subject": "Network issue",
+                    "status": "open",
+                    "priority": "normal",
+                    "created_at": "2026-11-17T12:00:00.123456Z",
+                    "updated_at": "2026-11-17T12:00:00.123456Z",
+                    "closed_at": null,
+                    "deleted_at": "2026-11-17T12:00:00.123456Z",
+                    "description": "Investigation",
+                    "contact": {
+                      "id": "43",
+                      "name": "Contact",
+                      "email": "contact@example.com",
+                      "phone": null,
+                      "active": true,
+                      "deleted_at": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}": {
+      "delete": {
+        "summary": "Soft-delete a live ticket",
+        "description": "Soft-delete a live ticket",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "42"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Soft-delete a live ticket"
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-17T12:00:00.123456Z"
+                  }
+                },
+                "required": [
+                  "updated_at"
+                ]
+              },
+              "example": {
+                "updated_at": "2026-11-17T12:00:00.123456Z"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/restore": {
+      "post": {
+        "summary": "Restore a soft-deleted ticket",
+        "description": "Restore a soft-deleted ticket",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "42"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Restore a soft-deleted ticket",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "ticket_number": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "client_id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "contact_id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "assigned_user_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[1-9][0-9]*$",
+                              "example": "42"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "created_by_user_id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "example": "42"
+                        },
+                        "subject": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 255
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "priority": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "example": "2026-11-17T12:00:00.123456Z"
+                        },
+                        "closed_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "example": "2026-11-17T12:00:00.123456Z"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "deleted_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "example": "2026-11-17T12:00:00.123456Z"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50000
+                        },
+                        "contact": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[1-9][0-9]*$",
+                                  "example": "42"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 255
+                                },
+                                "email": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 254
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "phone": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 50
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "active": {
+                                  "type": "boolean"
+                                },
+                                "deleted_at": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "example": "2026-11-17T12:00:00.123456Z"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "email",
+                                "phone",
+                                "active",
+                                "deleted_at"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "ticket_number",
+                        "client_id",
+                        "contact_id",
+                        "assigned_user_id",
+                        "created_by_user_id",
+                        "subject",
+                        "status",
+                        "priority",
+                        "created_at",
+                        "updated_at",
+                        "closed_at",
+                        "deleted_at",
+                        "description",
+                        "contact"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": {
+                    "id": "44",
+                    "ticket_number": "1",
+                    "client_id": "42",
+                    "contact_id": "43",
+                    "assigned_user_id": "7",
+                    "created_by_user_id": "7",
+                    "subject": "Network issue",
+                    "status": "open",
+                    "priority": "normal",
+                    "created_at": "2026-11-17T12:00:00.123456Z",
+                    "updated_at": "2026-11-17T12:00:00.123456Z",
+                    "closed_at": null,
+                    "deleted_at": null,
+                    "description": "Investigation",
+                    "contact": {
+                      "id": "43",
+                      "name": "Contact",
+                      "email": "contact@example.com",
+                      "phone": null,
+                      "active": true,
+                      "deleted_at": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-17T12:00:00.123456Z"
+                  }
+                },
+                "required": [
+                  "updated_at"
+                ]
+              },
+              "example": {
+                "updated_at": "2026-11-17T12:00:00.123456Z"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{ticket}/activity": {
+      "get": {
+        "summary": "Read bounded ticket audit history",
+        "description": "Read bounded ticket audit history",
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$",
+              "example": "42"
+            }
+          },
+          {
+            "name": "deleted_ticket",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read bounded ticket audit history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$",
+                            "example": "42"
+                          },
+                          "ticket_id": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$",
+                            "example": "42"
+                          },
+                          "user_id": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$",
+                            "example": "42"
+                          },
+                          "activity_type": {
+                            "type": "string",
+                            "enum": [
+                              "created",
+                              "updated"
+                            ]
+                          },
+                          "old_values": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": true
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "new_values": {
+                            "type": "object",
+                            "additionalProperties": true
+                          },
+                          "status_reason": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2000
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "example": "2026-11-17T12:00:00.123456Z"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ticket_id",
+                          "user_id",
+                          "activity_type",
+                          "old_values",
+                          "new_values",
+                          "status_reason",
+                          "created_at"
+                        ]
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "per_page",
+                        "last_page",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": "46",
+                      "ticket_id": "44",
+                      "user_id": "7",
+                      "activity_type": "created",
+                      "old_values": null,
+                      "new_values": {
+                        "id": "44",
+                        "ticket_number": "1",
+                        "client_id": "42",
+                        "contact_id": "43",
+                        "assigned_user_id": "7",
+                        "created_by_user_id": "7",
+                        "subject": "Network issue",
+                        "status": "open",
+                        "priority": "normal",
+                        "created_at": "2026-11-17T12:00:00.123456Z",
+                        "updated_at": "2026-11-17T12:00:00.123456Z",
+                        "closed_at": null,
+                        "deleted_at": null
+                      },
+                      "status_reason": null,
+                      "created_at": "2026-11-17T12:00:00.123456Z"
+                    }
+                  ],
+                  "meta": {
+                    "current_page": 1,
+                    "per_page": 25,
+                    "total": 1,
+                    "last_page": 1
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or wrong tenant token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Capability denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing, deleted, or cross-tenant record; invalid tenant host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concurrent write or invariant conflict; reload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input or unsupported fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Generic server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      }
+    }
+  }
+}
