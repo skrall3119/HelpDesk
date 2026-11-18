@@ -10,6 +10,7 @@ class CapabilitiesPostgresTest extends ApiPostgresTest
     {
         $this->getJson($this->url('capabilities'))->assertUnauthorized()->assertJsonPath('code', 'unauthenticated');
         $this->getJson($this->url('capabilities', 'b'), $this->headers)->assertUnauthorized();
+        $this->getJson($this->url('capabilities?tenant_id=99'), $this->headers)->assertUnprocessable();
         $this->getJson($this->url('capabilities'), $this->headers)->assertOk()->assertJsonFragment(['users.manage']);
         $this->role('technician');
         $response = $this->getJson($this->url('capabilities'), $this->headers)->assertOk();

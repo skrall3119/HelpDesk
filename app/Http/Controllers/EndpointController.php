@@ -58,6 +58,9 @@ abstract class EndpointController extends Controller
             if ($value !== null && ($field === 'id' || str_ends_with($field, '_id') || $field === 'ticket_number')) {
                 $value = (string) $value;
             }
+            if ($value !== null && str_ends_with($field, '_at')) {
+                $value = CarbonImmutable::parse($value)->toISOString();
+            }
             $data[$field] = $value;
         }
 
