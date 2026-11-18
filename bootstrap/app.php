@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EndpointErrors;
 use App\Http\Middleware\TenantContext;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
@@ -25,6 +26,10 @@ return Application::configure(basePath: dirname(__DIR__))
             prepend: TenantContext::class,
         );
         $middleware->redirectGuestsTo(fn (Request $request) => null);
+        $middleware->prependToPriorityList(
+            before: AuthenticatesRequests::class,
+            prepend: EndpointErrors::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->respond(function (Response $response) {
