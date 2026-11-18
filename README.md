@@ -12,6 +12,8 @@ API are implemented. Browser login and help desk screens remain future work.
 - [Authentication API reference](docs/AUTHENTICATION.md): endpoints, examples,
   token behavior, errors, and manual testing in Postman.
 - [OpenAPI contract](docs/openapi.json): machine-readable API definitions for client tools.
+- [API families and conventions](docs/API.md): capabilities, approved backend scope,
+  and the shared contract for the family-specific guides and OpenAPI documents.
 - [Database reference](database/README.md): schema, tenant isolation, and query invariants.
 - [Project plan](docs/PROJECT_PLAN.md) and [sprint schedule](docs/SPRINT_SCHEDULE.md):
   product decisions, acceptance gates, and planned work. Consult their current

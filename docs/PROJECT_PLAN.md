@@ -1,6 +1,15 @@
 # CaseLantern — Project Plan
 
-Last updated: 2026-11-17 (documentation organization)
+Last updated: 2026-11-17 (API implementation scope)
+
+**Owner update (2026-11-17):** implement all remaining V1 API families without frontend work,
+one branch/PR per family with at most three dependency layers. Preserve the existing
+login/logout/current-user routes and contracts. Approve the working defaults for all-role
+assignee eligibility, manager/admin unassignment and restoration, optimistic `updated_at`
+conflicts, validation limits, and pagination (25, maximum 100). Defer recovery/setup APIs
+and email delivery until frontend work. Employee creation uses an administrator-supplied
+initial password with a minimum of eight characters. Eventual reset/setup expiry is one/24
+hours respectively. See [API conventions](API.md) for this implementation's contracts.
 
 **Owner update (2026-11-11):** authentication uses bearer tokens with an absolute 48-hour expiry and fresh login afterward. This supersedes cookie-session/CSRF defaults throughout this plan and the sprint schedule for the application's header-authenticated APIs. Preserve tenant subdomains and request-local PostgreSQL isolation. See [AUTHENTICATION.md](AUTHENTICATION.md) for the implemented endpoint contract. Server procedures are consolidated in the untracked local runbook. Login/logout/current-user are implemented in this change; server verification, recovery/setup, capabilities and frontend authentication remain outstanding. Development deployment is automatic from `main` only after CI passes; see the untracked local runbook.
 
