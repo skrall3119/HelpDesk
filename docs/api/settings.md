@@ -8,9 +8,9 @@ Administrator only (`settings.manage`). Only the display name is editable. Slug,
 
 ## GET /admin/settings
 
-Read organization display name. 
+Read organization display name.
 
-Success: **200**. 
+Success: **200**.
 
 Response example:
 ```json
@@ -24,9 +24,9 @@ Response example:
 ```
 ## PATCH /admin/settings
 
-Change organization display name. 
+Change organization display name.
 
-Success: **200**. 
+Success: **200**.
 
 Request:
 ```json
