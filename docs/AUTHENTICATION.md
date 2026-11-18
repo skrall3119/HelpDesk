@@ -33,7 +33,8 @@ Authorization: Bearer <access_token>
 
 The token is opaque, not a JWT. Use employee credentials provisioned for the selected
 tenant, not PostgreSQL or server credentials. Public registration, password recovery,
-token refresh, and capability-list endpoints are not implemented.
+and token refresh are not implemented. See [API conventions](API.md#get-capabilities)
+for the separate capability-discovery endpoint.
 
 ## POST /api/v1/login
 
