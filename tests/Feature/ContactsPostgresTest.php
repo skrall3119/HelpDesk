@@ -4,9 +4,33 @@ namespace Tests\Feature;
 
 use Illuminate\Support\Facades\DB;
 use Tests\Support\ApiPostgresTest;
+use Tests\Support\ConcurrentRequests;
 
 class ContactsPostgresTest extends ApiPostgresTest
 {
+    use ConcurrentRequests;
+
+    public function test_concurrent_primary_changes_reject_stale_client_versions(): void
+    {
+        $client = $this->client();
+        $requests = [];
+        foreach (['First', 'Second'] as $name) {
+            $id = DB::table('contacts')->insertGetId(['tenant_id' => $this->pair['a']['tenant_id'], 'client_id' => $client->id, 'name' => $name, 'phone' => '555-0100']);
+            $version = DB::table('contacts')->where('id', $id)->value('updated_at');
+            $requests[] = ['url' => $this->url('clients/'.$client->id.'/contacts/'.$id.'/primary'), 'method' => 'POST', 'authorization' => $this->headers['Authorization'], 'body' => ['updated_at' => $version, 'client_updated_at' => $client->updated_at]];
+        }
+        DB::commit();
+        // Committed synthetic race fixtures remain only in the disposable _test DB.
+        $this->fixtures = null;
+        $responses = $this->concurrentRequests($requests);
+        $statuses = array_column($responses, 'status');
+        sort($statuses);
+        $this->assertSame([200, 409], $statuses);
+        DB::beginTransaction();
+        DB::selectOne("SELECT set_config('app.tenant_id', ?, true)", [$this->pair['a']['tenant_id']]);
+        $this->assertSame(1, DB::table('contacts')->where('client_id', $client->id)->where('is_primary', true)->where('active', true)->count());
+    }
+
     public function test_contacts_validate_merged_method_and_cannot_move_between_clients(): void
     {
         $client = $this->client();
