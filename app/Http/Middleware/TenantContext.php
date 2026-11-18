@@ -29,6 +29,7 @@ class TenantContext
         try {
             $connection->selectOne("SELECT set_config('app.tenant_id', ?, true)", [(string) $tenant->id]);
             $connection->selectOne("SELECT set_config('app.user_id', '', true)");
+            $connection->selectOne("SELECT set_config('app.status_reason', '', true)");
             $request->attributes->set('tenant_id', (string) $tenant->id);
             $response = $next($request);
             if ($response->getStatusCode() >= 400) {

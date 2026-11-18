@@ -13,7 +13,11 @@ Route::middleware('auth:api')->group(function (): void {
 });
 
 Route::middleware([EndpointErrors::class, 'auth:api'])->group(function (): void {
-    Route::get('capabilities', fn (Request $request) => response()->json(['data' => Capabilities::for($request->user('api'))]));
+    Route::get('capabilities', function (Request $request) {
+        abort_if($request->all() !== [], 422, 'No input fields are supported.');
+
+        return response()->json(['data' => Capabilities::for($request->user('api'))]);
+    });
     foreach (glob(__DIR__.'/api/*.php') as $routes) {
         require $routes;
     }
