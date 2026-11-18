@@ -8,6 +8,21 @@ Each additional family ships its own guide and standalone OpenAPI document in
 `docs/openapi/`. These contracts can be imported individually into API clients.
 The existing `docs/openapi.json` continues to describe the original auth routes.
 
+Family PRs (all based on authentication #9; merge the existing documentation #8 first):
+
+| Family | PR |
+| --- | --- |
+| Authentication/capabilities | [#9](https://github.com/skrall3119/HelpDesk/pull/9) |
+| Organization settings | [#10](https://github.com/skrall3119/HelpDesk/pull/10) |
+| Employees | [#11](https://github.com/skrall3119/HelpDesk/pull/11) |
+| Clients | [#12](https://github.com/skrall3119/HelpDesk/pull/12) |
+| Contacts | [#13](https://github.com/skrall3119/HelpDesk/pull/13) |
+| Tickets/search/editing | [#14](https://github.com/skrall3119/HelpDesk/pull/14) |
+| Assignment | [#15](https://github.com/skrall3119/HelpDesk/pull/15) |
+| Status | [#16](https://github.com/skrall3119/HelpDesk/pull/16) |
+| Comments/revisions | [#17](https://github.com/skrall3119/HelpDesk/pull/17) |
+| History/restoration | [#18](https://github.com/skrall3119/HelpDesk/pull/18) |
+
 ## Shared contract for new endpoints
 
 Send `Accept: application/json` and `Authorization: Bearer <token>`; mutation
