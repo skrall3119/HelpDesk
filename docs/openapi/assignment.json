@@ -345,7 +345,30 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "code",
+                    "message",
+                    "assigned_user_id"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": "conflict"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "assigned_user_id": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]*$"
+                    }
+                  }
+                },
+                "example": {
+                  "code": "conflict",
+                  "message": "Ticket is already assigned.",
+                  "assigned_user_id": "7"
                 }
               }
             }
