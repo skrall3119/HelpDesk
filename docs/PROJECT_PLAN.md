@@ -1,10 +1,10 @@
 # CaseLantern — Project Plan
 
-Last updated: 2026-11-11
+Last updated: 2026-11-17 (documentation organization)
 
-**Owner update (2026-11-11):** authentication uses bearer tokens with an absolute 48-hour expiry and fresh login afterward. This supersedes cookie-session/CSRF defaults throughout this plan and the sprint schedule for the application's header-authenticated APIs. Preserve tenant subdomains and request-local PostgreSQL isolation. See [AUTHENTICATION.md](AUTHENTICATION.md) for the implemented contract and development setup. Login/logout/current-user are implemented in this change; server verification, recovery/setup, capabilities and frontend authentication remain outstanding. Development deployment is automatic from `main` only after CI passes; see [DEPLOYMENT.md](DEPLOYMENT.md).
+**Owner update (2026-11-11):** authentication uses bearer tokens with an absolute 48-hour expiry and fresh login afterward. This supersedes cookie-session/CSRF defaults throughout this plan and the sprint schedule for the application's header-authenticated APIs. Preserve tenant subdomains and request-local PostgreSQL isolation. See [AUTHENTICATION.md](AUTHENTICATION.md) for the implemented endpoint contract. Server procedures are consolidated in the untracked local runbook. Login/logout/current-user are implemented in this change; server verification, recovery/setup, capabilities and frontend authentication remain outstanding. Development deployment is automatic from `main` only after CI passes; see the untracked local runbook.
 
-This is the authoritative product and implementation plan. The older lowercase `project_plan.md` is historical. The PostgreSQL migration describes currently implemented database behavior; confirmed product decisions in this plan define the target behavior. Where they differ, the schema must be reconciled before affected application work. This plan also describes application behavior that has not been built yet.
+This is the authoritative product and implementation plan. The superseded early outline is retained in Git history. The PostgreSQL migration describes currently implemented database behavior; confirmed product decisions in this plan define the target behavior. Where they differ, the schema must be reconciled before affected application work. This plan also describes application behavior that has not been built yet.
 
 **Decision labels:** **Confirmed** comes from prior discussion. **Implemented** describes existing repository artifacts, not a finished application. **Working default** is an engineering/product recommendation that allows planning to proceed and may be revised. **Pending answer** identifies a question currently with the owner. Working defaults are not retroactive user approvals.
 
@@ -33,7 +33,7 @@ Existing files:
 
 - [`database/migrations/001_initial.sql`](../database/migrations/001_initial.sql): initial schema.
 - [`database/tests/schema.sql`](../database/tests/schema.sql): disposable database checks.
-- [`database/README.md`](../database/README.md): SQL setup, context, runtime privileges, and query examples.
+- [`database/README.md`](../database/README.md): schema invariants, context, runtime privileges, and query examples.
 
 The schema does not by itself implement a usable or production-ready SaaS application.
 
@@ -254,7 +254,7 @@ The current RLS design cannot resolve an unknown tenant ID from its slug through
 
 Working implementation defaults: validate hosts against the configured base domain, keep session cookies host-only (`SESSION_DOMAIN` unset/null), and generate login/recovery URLs for the resolved tenant host. Local testing can use `acme.localhost:8000` through the existing SSH tunnel; verify hostname resolution on the user's browser. The production base domain and wildcard DNS/TLS remain deployment decisions. Subdomain selection never substitutes for tenant authorization or PostgreSQL context.
 
-Provisioning implementation: [`TENANT_PROVISIONING.md`](TENANT_PROVISIONING.md) documents `php artisan caselantern:provision-tenant`, its command-scoped migration credentials, password prompts, and disposable PostgreSQL checks. It reserves a tenant identity before establishing transaction-local context, so tenant/admin inserts satisfy forced RLS. No browser login or public provisioning endpoint is implemented by this slice. The owner ran the command/real PostgreSQL tests successfully on the server (17 tests, 59 assertions), confirmed formatting, and provisioned an initial organization; no password is recorded here.
+Provisioning implementation: the untracked local runbook documents `php artisan caselantern:provision-tenant`, its command-scoped migration credentials, password prompts, and disposable PostgreSQL checks. It reserves a tenant identity before establishing transaction-local context, so tenant/admin inserts satisfy forced RLS. No browser login or public provisioning endpoint is implemented by this slice. The owner ran the command/real PostgreSQL tests successfully on the server (17 tests, 59 assertions), confirmed formatting, and provisioned an initial organization; no password is recorded here.
 
 ### Request sequence
 
@@ -348,7 +348,7 @@ Definition of done for each implementation slice: documented API contracts and d
 
 ## 15. Development workflow and CI
 
-Verified development setup: the existing native remote Fedora server with Laravel/PHP, PostgreSQL 18.6, built frontend assets, and Windows SSH forwarding. Keep this workflow; Docker Compose is optional portability work and is not a V1 prerequisite. Add development mail capture for recovery/setup testing. Bind local services appropriately; no committed credentials. A root README will document installation, migrations, provisioning, assets, test commands, and troubleshooting once scaffolded. Provide `.env.example` with safe placeholders and committed Composer/npm lockfiles.
+Verified development setup: the existing native remote Fedora server with Laravel/PHP, PostgreSQL 18.6, built frontend assets, and Windows SSH forwarding. Keep this workflow; Docker Compose is optional portability work and is not a V1 prerequisite. Add development mail capture for recovery/setup testing. Bind local services appropriately; no committed credentials. The root README indexes project documentation. Operational commands for our server belong only in the untracked local runbook; endpoint usage belongs in the API reference. This is a private application, not a downloadable product with a public installation guide. Provide `.env.example` with safe placeholders and committed Composer/npm lockfiles.
 
 CI should run on proposed changes: install locked dependencies, check formatting/static analysis, build frontend assets, create a fresh PostgreSQL database, migrate/provision fixtures, run SQL, API contract, and application tests, and exercise non-owner runtime credentials. Do not substitute a superuser connection for RLS assertions. Add browser checks after the first vertical slice exists. Test migration from the last release before production database changes.
 
