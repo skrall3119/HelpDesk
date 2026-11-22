@@ -1,0 +1,85 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CaseLantern capabilities API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://{tenant}.{domain}/api/v1",
+      "variables": {
+        "tenant": {
+          "default": "acme"
+        },
+        "domain": {
+          "default": "example.com"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/capabilities": {
+      "get": {
+        "summary": "Read current employee capabilities",
+        "responses": {
+          "200": {
+            "description": "Current capabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "data": [
+                    "tickets.read",
+                    "tickets.write",
+                    "tickets.claim",
+                    "tickets.status",
+                    "clients.write",
+                    "comments.write"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, expired, revoked or wrong-tenant bearer token"
+          },
+          "404": {
+            "description": "Unknown or inactive tenant"
+          },
+          "413": {
+            "description": "Request exceeds 128 KiB"
+          },
+          "422": {
+            "description": "Input fields are not supported"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
