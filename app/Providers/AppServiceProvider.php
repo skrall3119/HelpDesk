@@ -3,9 +3,12 @@
 namespace App\Providers;
 
 use App\Auth\BearerTokens;
+use App\Auth\Capabilities;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -24,6 +27,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        foreach (Capabilities::ALL as $capability) {
+            Gate::define($capability, fn (User $user) => in_array($capability, Capabilities::for($user), true));
+        }
         Auth::viaRequest('tenant-bearer', fn (Request $request) => app(BearerTokens::class)->authenticate($request));
         RateLimiter::for('login', function (Request $request): array {
             $email = $request->input('email');
