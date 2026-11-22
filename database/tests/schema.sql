@@ -16,9 +16,9 @@ INSERT INTO users(id, tenant_id, name, email, password, role) OVERRIDING SYSTEM 
     (100, 100, 'A Tech', 'tech@example.com', 'test-hash', 'technician'),
     (200, 200, 'B Tech', 'tech@example.com', 'test-hash', 'technician');
 INSERT INTO clients(id, tenant_id, client_type, name) OVERRIDING SYSTEM VALUE VALUES (100, 100, 'business', 'Client A'), (101, 100, 'individual', 'Other A'), (200, 200, 'business', 'Client B');
-INSERT INTO contacts(id, tenant_id, client_id, name, is_primary) OVERRIDING SYSTEM VALUE VALUES
-    (100, 100, 100, 'A Contact', true), (101, 100, 101, 'Other Contact', true), (200, 200, 200, 'B Contact', true);
-SELECT pg_temp.rejects($q$INSERT INTO contacts(tenant_id,client_id,name,is_primary) VALUES (100,100,'Duplicate Primary',true)$q$, '23505');
+INSERT INTO contacts(id, tenant_id, client_id, name, is_primary, phone) OVERRIDING SYSTEM VALUE VALUES
+    (100, 100, 100, 'A Contact', true, '555-0100'), (101, 100, 101, 'Other Contact', true, '555-0101'), (200, 200, 200, 'B Contact', true, '555-0200');
+SELECT pg_temp.rejects($q$INSERT INTO contacts(tenant_id,client_id,name,is_primary,phone) VALUES (100,100,'Duplicate Primary',true,'555-0102')$q$, '23505');
 SELECT pg_temp.rejects($q$INSERT INTO users(tenant_id,name,email,password,role) VALUES (100,'A Duplicate','TECH@example.com','test-hash','technician')$q$, '23505');
 SELECT pg_temp.rejects($q$UPDATE users SET name='   ' WHERE id=100$q$, '23514');
 SELECT pg_temp.rejects($q$UPDATE contacts SET name='   ' WHERE id=100$q$, '23514');
